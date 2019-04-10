@@ -9,48 +9,78 @@ function sox.open_command(sox_command, sample_rate)
 	
 	-- return a function that takes a sample count and returns samples of a sinewave at that frequency.
 	function sound:generate_sin(pitch)
-		local seconds_per_frame = 1/self.sample_rate
-		local radians_per_second = pitch * 2 * math.pi
-		local frame_count = 1000
-		local offset_seconds = 0
+		local sin = math.sin
 		
-		-- generate a single sample based on frame, the sample index
-		local function generate_sample()
-			local sample = math.sin(offset_seconds * radians_per_second)
-			offset_seconds = (offset_seconds + seconds_per_frame) % 10000
-			return sample
+		-- generate a single sample based on it's index
+		local function generate_frame(frame_index)
+			local seconds_per_frame = 1/self.sample_rate
+			local radians_per_second = pitch * 2 * math.pi
+			return sin(frame_index * seconds_per_frame * radians_per_second)
 		end
 		
 		-- generate a ammount of samples
-		local function generate_samples(frame_count)
-			local samples = {}
-			for frame=0, frame_count-1 do
-				local sample = generate_sample(frame)
-				table.insert(samples, sample)
+		local function generate_frames(frame_count, frame_index, frames_buf)
+			local frames = frames_buf or {}
+			for frame_offset=0, frame_count-1 do
+				frames[frame_offset + 1] = generate_frame(frame_offset+frame_index)
 			end
-			return samples
+			return frames, frame_count+frame_index
 		end
 		
-		return generate_samples
+		return generate_frames
 		
 	end
 	
 	
 	-- generate a square wave by generating a sine wave, then set the output sample high if a sample is >0, low otherwise.
 	function sound:generate_square(pitch)
-		local _generate_samples = sound:generate_sin(pitch)
-		local function generate_samples(frame_count)
-			local samples = _generate_samples(frame_count)
-			for i=1, #samples do
-				if samples[i] > 0 then
-					samples[i] = 1
-				else
-					samples[i] = -1
-				end
+		local sin = math.sin
+		
+		-- generate a single sample based on it's index
+		local function generate_frame(frame_index)
+			local seconds_per_frame = 1/self.sample_rate
+			local radians_per_second = pitch * 2 * math.pi
+			local s = sin(frame_index * seconds_per_frame * radians_per_second)
+			if s > 0 then
+				return 1
 			end
-			return samples
+			return -1
 		end
-		return generate_samples
+		
+		-- generate a ammount of samples
+		local function generate_frames(frame_count, frame_index, frames_buf)
+			local frames = frames_buf or {}
+			for frame_offset=0, frame_count-1 do
+				frames[frame_offset + 1] = generate_frame(frame_offset+frame_index)
+			end
+			return frames, frame_count+frame_index
+		end
+		
+		return generate_frames
+	end
+	
+	
+	
+	function sound:empty_buffer(frame_count, frame_buf)
+		local frame_buf = frame_buf or {}
+		for i=1, frame_count do
+			frame_buf[i] = 0
+		end
+		return frame_buf
+	end
+	
+	
+	
+	function sound:mix_frames(frame_bufs, out_buf)
+		for i, frame_buf in ipairs(frame_bufs) do
+			for j=1, #frame_buf do
+				out_buf[j] = out_buf[j] + frame_buf[j]
+			end
+		end
+		for j=1, #out_buf do
+			out_buf[j] = math.tanh(out_buf[j])
+		end
+		return out_buf
 	end
 	
 	
@@ -68,8 +98,8 @@ function sox.open_command(sox_command, sample_rate)
 			end
 		end
 		for i=1, #out_samples do
-			out_samples[i] = out_samples[i] / out_counts[i]
-			out_samples[i] = math.tanh(out_samples[i])
+			--out_samples[i] = out_samples[i] / out_counts[i]
+			out_samples[i] = math.tanh(math.tanh(out_samples[i] * 0.9))
 		end
 		return out_samples
 	end
@@ -78,19 +108,24 @@ function sox.open_command(sox_command, sample_rate)
 	-- open the proc
 	function sound:open_proc()
 		self.proc = assert(io.popen(sox_command, "w"))
-		self.proc:setvbuf("full")
+		self.proc:setvbuf("no")
 	end
 	
 	
 	-- write samples to sox
+	local out_buffer = {}
+	local _c = string.char
+	local _f = math.floor
+	local function a_to_c(a)
+		return _c( _f( (a+1)*127 ) )
+	end
 	function sound:write_samples(samples)
-		local proc = assert(self.proc)
-		local sample_data = {}
 		for i=1, #samples do
-			sample_data[i] = string.char(math.floor((samples[i] + 1) * 127.5))
+			--out_buffer[i] = a_to_c(samples[i])
+			self.proc:write(a_to_c(samples[i]))
 		end
-		proc:write(table.concat(sample_data))
-		proc:flush()
+		-- self.proc:write(table.concat(out_buffer))
+		-- self.proc:flush()
 	end
 	
 	return sound
@@ -99,7 +134,8 @@ end
 
 
 function sox.open_default()
-	return sox.open_command("play -t raw -b 8 -e unsigned -c 1 -r 22050 - 2> /dev/null", 22050)
+	return sox.open_command("play -V3 --buffer 256 -t raw -b 8 -e unsigned-integer -c 1 -r 11025 -", 11025)
+	-- return sox.open_command("pv > /dev/null", 22050)
 end
 
 

@@ -1,25 +1,21 @@
 #!/usr/bin/env luajit
 
 local sox = require("sox")
-
-
-local snd = sox.open_default()
-local gen_sin = snd:generate_sin(440)
-local gen_sqr = snd:generate_square(220)
-
-
+local input = require("input")
+local time = require("time")
+local input_event_codes = require("input-event-codes")
 
 local function plot_samples(samples, max_width)
 	local ldb = require("ldb")
 	local braile = require("braile")
 	local term = require("term")
-	local width = math.min(#samples, max_width or 200)
-	local height = 50
+	local width = math.min(#samples, max_width or 150)
+	local height = 90
 	
 	local db = ldb.new(width, height)
 	db:clear(0,0,0,255)
 	db:set_line(0, math.floor(height/2), width-1, math.floor(height/2), 127,127,127,255)
-	local last_sample = 0
+	local last_sample = height/2
 	for i=1, #samples do
 		local sample = ((samples[i]+1)/2)*(height-1)
 		db:set_line(i-1, last_sample, i, sample, 255,0,0,255)
@@ -33,19 +29,80 @@ end
 
 
 
+local snd = sox.open_default()
+-- how many samples to generate per iteration
+local frame_count = 256
+
+
+-- map a key to a configuration for the tone generator
+local mapping = {
+	[input_event_codes.KEY_Q] = { gen = snd:generate_sin(27), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_W] = { gen = snd:generate_sin(41), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_E] = { gen = snd:generate_sin(61), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_R] = { gen = snd:generate_sin(87), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_T] = { gen = snd:generate_sin(130), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_Y] = { gen = snd:generate_sin(196), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_U] = { gen = snd:generate_sin(329), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_I] = { gen = snd:generate_sin(440), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_O] = { gen = snd:generate_sin(659), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_P] = { gen = snd:generate_sin(987), buf = snd:empty_buffer(frame_count), index = 0},
+	
+	[input_event_codes.KEY_A] = { gen = snd:generate_square(41), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_S] = { gen = snd:generate_square(61), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_D] = { gen = snd:generate_square(87), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_F] = { gen = snd:generate_square(130), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_G] = { gen = snd:generate_square(196), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_H] = { gen = snd:generate_square(329), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_J] = { gen = snd:generate_square(440), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_K] = { gen = snd:generate_square(659), buf = snd:empty_buffer(frame_count), index = 0},
+	[input_event_codes.KEY_L] = { gen = snd:generate_square(987), buf = snd:empty_buffer(frame_count), index = 0},
+}
+
+
+
+
+
 snd:open_proc()
 local last
+local frame_index = 0
+local frame_buffer = snd:empty_buffer(frame_count)
+local tones
+local input_dev = assert(input.open(arg[1]), true)
+local last_time = time.realtime()
 while true do
-	local samples
-	if last then
-		print("sin")
-		samples = gen_sin(2 * 22050)
-		last = false
-	else
-		print("sqr")
-		samples = gen_sqr(2 * 22050)
-		last = true
+
+	local ev = input_dev:read()
+	while ev do
+	if ev.type == input_event_codes.EV_KEY then
+			if mapping[ev.code] then
+				mapping[ev.code].active = (ev.value ~= 0)
+			end
+		end
+		ev = input_dev:read()
 	end
-	plot_samples(samples)
-	snd:write_samples(samples)
+	
+	if (time.realtime() - last_time)+0.01 >= (1/snd.sample_rate) * frame_count then
+	
+		local frames_bufs = {}
+		for key, sound in pairs(mapping) do
+			if sound.active then
+				local frame_buf, frame_index = sound.gen(frame_count, sound.index, sound.buf)
+				sound.buf = frame_buf
+				sound.index = frame_index
+				table.insert(frames_bufs, frame_buf)
+			else
+				sound.buf = snd:empty_buffer(frame_count, sound.buf)
+				sound.index = 0
+			end
+		end
+	
+		snd:empty_buffer(frame_count, frame_buffer)
+		snd:mix_frames(frames_bufs, frame_buffer)
+		snd:write_samples(frame_buffer)
+		plot_samples(frame_buffer)
+		last_time = time.realtime()
+	else
+		time.sleep(0.005)
+	end
+	
 end
