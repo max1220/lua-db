@@ -81,7 +81,7 @@ function Bitmap.decode_header(str)
 	local height = r_uint32(22)
 	
 	-- check data_size
-	assert(r_uint32(34) == width*height*3)
+	-- assert(r_uint32(34) == width*height*3, ("Header data size: %d, expected data size: %d"):format(r_uint32(34), width*height*3))
 	
 	local header = {
 		width = width,
