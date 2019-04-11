@@ -120,12 +120,19 @@ function sox.open_command(sox_command, sample_rate)
 		return _c( _f( (a+1)*127 ) )
 	end
 	function sound:write_samples(samples)
+		local last_sample
+		local skip = 0
 		for i=1, #samples do
-			--out_buffer[i] = a_to_c(samples[i])
-			self.proc:write(a_to_c(samples[i]))
+			local csample = a_to_c(samples[i-skip])
+			out_buffer[i-skip] = csample
+			if last_sample == 0 and csample == 0 then
+				skip = skip + 1
+			end
+			last_sample = csample
+			--self.proc:write(csample)
 		end
-		-- self.proc:write(table.concat(out_buffer))
-		-- self.proc:flush()
+		self.proc:write(table.concat(out_buffer))
+		self.proc:flush()
 	end
 	
 	return sound

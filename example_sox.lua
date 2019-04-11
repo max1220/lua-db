@@ -79,8 +79,9 @@ while true do
 		ev = input_dev:read()
 	end
 	
-	if (time.realtime() - last_time)+0.01 >= (1/snd.sample_rate) * frame_count then
-	
+	if (time.realtime() - last_time) >= (1/snd.sample_rate) * frame_count then
+		last_time = time.realtime()
+		
 		local frames_bufs = {}
 		for key, sound in pairs(mapping) do
 			if sound.active then
@@ -98,9 +99,9 @@ while true do
 		snd:mix_frames(frames_bufs, frame_buffer)
 		snd:write_samples(frame_buffer)
 		plot_samples(frame_buffer)
-		last_time = time.realtime()
+		
 	else
-		time.sleep(0.005)
+		-- time.sleep(.0005)
 	end
 	
 end
