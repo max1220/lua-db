@@ -41,6 +41,14 @@ function ppm.decode_from_string_drawbuffer(str)
 end
 
 
+-- decode from a file into a new drawbuffer
+function ppm.decode_from_file_drawbuffer(filepath)
+	local file = assert(io.open(filepath, "rb"))
+	local str = file:read("*a")
+	return ppm.decode_from_string_drawbuffer(str)
+end
+
+
 -- encode a .ppm based on a width, height and pixel_callback
 function ppm.encode_from_pixel_callback(width, height, pixel_callback)
 	local ppm_data = {}
