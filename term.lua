@@ -26,13 +26,17 @@ function term.get_screen_size()
 		p = io.popen("tput cols")
 		cols = assert(tonumber(p:read("*a")))
 	else
-		-- no tput, use bash variables(requires bash)
-		-- TODO: also try stty size
-		lines = os.getenv("LINES")
-		cols = os.getenv("COLUMNS")
+		p:close()
+		p = io.popen("stty size")
+		lines, cols = p:read("*a"):match("^(%d+) (%d+)")
+		if not lines then
+			-- no tput/stty, use bash variables(requires bash)
+			lines = os.getenv("LINES")
+			cols = os.getenv("COLUMNS")
+		end
 	end
 	p:close()
-	return cols, lines
+	return tonumber(cols), tonumber(lines)
 end
 
 
