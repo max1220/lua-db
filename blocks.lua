@@ -1,4 +1,4 @@
-local term = require("term")
+local term = require("lua-db.term")
 
 
 

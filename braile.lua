@@ -1,16 +1,33 @@
 local utf8 = require("utf8")
-local term = require("term")
+local term = require("lua-db.term")
 
 
 -- Draw on the terminal using braile characters
 local Braile = {}
 
 
+-- convert a unicode codepoint to utf8 character sequence
+local function unicode_to_utf8(c)
+	-- from https://gist.github.com/pygy/7154512
+	assert((55296 > c or c > 57343) and c < 1114112, "Bad Unicode code point: "..c..".")
+	if c < 128 then
+		return string.char(c)
+	elseif c < 2048 then
+		return string.char(192 + c/64, 128 + c%64)
+	elseif c < 55296 or 57343 < c and c < 65536 then
+		return string.char(224 + c/4096, 128 + c/64%64, 128 + c%64)
+	elseif c < 1114112 then
+		return string.char(240 + c/262144, 128 + c/4096%64, 128 + c/64%64, 128 + c%64)
+	end
+end
+
+
 -- convert the set bits to a utf8 character sequence
 function Braile.get_chars(bits)
 	
 	-- braile characters start at unicode 0x2800
-	return utf8.char(bits + 0x2800)
+	-- return utf8.char(bits + 0x2800)
+	return unicode_to_utf8(bits + 0x2800)
 end
 
 

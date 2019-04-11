@@ -2,6 +2,7 @@ local Font = {}
 
 function Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 	local font = {}
+	local scale = tonumber(scale) or 1
 	
 	font.db = assert(db)
 	font.char_w = assert(tonumber(char_w))
@@ -9,8 +10,8 @@ function Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 	if alpha_color then
 		local ar, ag, ab = unpack(alpha_color)
 		-- set the alpha values of pixels with this r,g,b value to 0
-		for y=0, db.height-1 do
-			for x=0, db.width-1 do
+		for y=0, db:height()-1 do
+			for x=0, db:width()-1 do
 				local r,g,b = db:get_pixel(x,y)
 				if r == ar and g == ag and b == ab then
 					db:set_pixel(x,y,r,g,b, 0)
@@ -65,7 +66,7 @@ function Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 			end
 		else
 			for i=1, #str do
-				self:draw_character(target_db, str:byte(i), x+(i-1)*char_w, y)
+				self:draw_character(target_db, str:byte(i), x+(i-1)*char_w*scale, y)
 			end
 		end
 	end
@@ -88,9 +89,9 @@ end
 
 
 function Font.from_file(filepath, char_w, char_h, alpha_color, scale)
-	local Bitmap = require("Bitmap")
+	local Bitmap = require("lua-db.bitmap")
 	local db = Bitmap.decode_from_file_drawbuffer(filepath)
-	return Font.from_drawbuffer(db)
+	return Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 end
 
 

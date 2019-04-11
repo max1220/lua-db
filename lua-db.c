@@ -206,11 +206,9 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 				} else {
 					// draw scaled
 					p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
-					if (p.a > 0) {
-						for (sy=0; sy < scale; sy=sy+1) {
-							for (sx=0; sx < scale; sx=sx+1) {
-								DB_SET_PX(target_db, (cx+sx+target_x), (cy+sy+target_y), p)
-							}
+					for (sy=0; sy < scale; sy=sy+1) {
+						for (sx=0; sx < scale; sx=sx+1) {
+							DB_SET_PX(target_db, (cx*scale+sx+target_x), (cy*scale+sy+target_y), p)
 						}
 					}
 				}
@@ -491,8 +489,19 @@ static int l_new(lua_State *L) {
 }
 
 
-
+/*
 LUALIB_API int luaopen_ldb(lua_State *L) {
+	lua_newtable(L);
+
+	LUA_T_PUSH_S_S("version", VERSION)
+	LUA_T_PUSH_S_CF("new", l_new)
+
+	return 1;
+}
+*/
+
+
+LUALIB_API int luaopen_db_lua_db(lua_State *L) {
 	lua_newtable(L);
 
 	LUA_T_PUSH_S_S("version", VERSION)

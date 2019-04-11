@@ -1,15 +1,15 @@
 #!/usr/bin/env luajit
-local ldb = require("ldb")
-local braile = require("braile")
-local blocks = require("blocks")
-local Font = require("font")
-local bitmap = require("bitmap2")
+local ldb = require("lua-db")
+local braile = ldb.braile
+local blocks = ldb.blocks
+local Font = ldb.font
+local bitmap = ldb.bitmap
 
 -- parse arguments
 local font_file = assert(io.open(arg[1], "rb"))
 local char_w = assert(tonumber(arg[2]))
 local char_h = assert(tonumber(arg[3]))
-local out_file = io.open(arg[4], "wb")
+local out_file = io.open(arg[4] or "", "wb")
 local text = io.stdin:read("*a")
 
 -- load font header & image from file
@@ -27,7 +27,7 @@ local font = Font.from_drawbuffer(font_db, char_w, char_h)
 local width,height = font:string_size(text)
 
 -- create drawbuffer for output
-local target = ldb.new(128, 20)
+local target = ldb.new(width, height)
 target:clear(0,0,0,255)
 
 -- render a string into the target drawbuffer

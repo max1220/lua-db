@@ -1,3 +1,5 @@
+local ldb = require("lua-db.lua_db")
+
 local Bitmap = {}
 
 
@@ -114,7 +116,6 @@ end
 -- decode from a string into a new drawbuffer with the correct dimensions
 function Bitmap.decode_from_string_drawbuffer(str)
 	local header = Bitmap.decode_header(str)
-	local ldb = require("ldb")
 	local db = ldb.new(header.width, header.height)
 	
 	Bitmap.decode_from_string_pixel_callback(str, function(x,y,r,g,b)

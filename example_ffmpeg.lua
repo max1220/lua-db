@@ -1,7 +1,7 @@
 #!/usr/bin/env luajit
-local ldb = require("ldb")
-local term = require("term")
-local ffmpeg = require("ffmpeg")
+local ldb = require("lua-db")
+local term = ldb.term
+local ffmpeg = ldb.ffmpeg
 
 
 local dev = assert(arg[1], "Argument 1 should be a device(e.g. /dev/video0) or video file")
@@ -13,18 +13,18 @@ local height = assert(tonumber(arg[3]), "Argument 3 should be a height(e.g. 1080
 local lfb, sdl2fb, braile, blocks
 local output
 if arg[4] == "sdl" then
-	sdl2fb = require("sdl2fb")
+	sdl2fb = ldb.sdl2fb
 elseif arg[4] == "fb" then
-	lfb = require("lfb")
+	lfb = ldb.fb
 elseif arg[4] == "braile" then
-	braile = require("braile")
+	braile = ldb.braile
 	-- use 24-bit colors
 	if arg[5] == "24bpp" then
 		braile.get_color_code_fg = braile.get_color_code_fg_24bit
 		--braile.get_color_code_bg = braile.get_color_code_bg_24bit
 	end
 elseif arg[4] == "blocks" then
-	blocks = require("blocks")
+	blocks = ldb.blocks
 	if arg[5] == "24bpp" then
 		blocks.get_color_code_bg = term.rgb_to_ansi_color_bg_24bpp
 	end

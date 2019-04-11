@@ -30,7 +30,7 @@ end
 
 -- decode a .ppm from a string into a drawbuffer
 function ppm.decode_from_string_drawbuffer(str)
-	local ldb = require("ldb")
+	local ldb = require("lua-db")
 	local db = ldb.new(header.width, header.height)
 	
 	pgm.decode_from_string_pixel_callback(str, function(x,y,r,g,b)

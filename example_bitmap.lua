@@ -1,24 +1,19 @@
 #!/usr/bin/env luajit
-local ldb = require("ldb")
-local bitmap = require("bitmap2")
+local ldb = require("lua-db")
+local bitmap = ldb.bitmap
 
 local draw_db
+local bpp24 = false
 if arg[2] == "braile" then
-	local braile = require("braile")
-	draw_db = braile.draw_db()
+	draw_db = ldb.braile.draw_db_precise
 elseif arg[2] == "braile24bpp" then
-	local braile = require("braile")
-	braile.get_color_code_fg = braile.get_color_code_fg_24bit
-	braile.get_color_code_bg = braile.get_color_code_bg_24bit
-	draw_db = braile.draw_db()
-elseif arg[3] == "blocks" then
-	local blocks = require("blocks")
-	draw_db = blocks.draw_db()
-elseif arg[4] == "blocks24bpp" then
-	local blocks = require("blocks")
-	blocks.get_color_code_fg = blocks.get_color_code_fg_24bit
-	blocks.get_color_code_bg = blocks.get_color_code_bg_24bit
-	draw_db = blocks.draw_db()
+	draw_db = ldb.braile.draw_db_precise
+	bpp24 = true
+elseif arg[2] == "blocks" then
+	draw_db = ldb.blocks.draw_db
+elseif arg[2] == "blocks24bpp" then
+	draw_db = ldb.blocks.draw_db
+	ldb.blocks.get_color_code_bg = ldb.term.rgb_to_ansi_color_bg_24bpp
 else
 	error("Argument 2 should be one of: braile, braile24bpp, blocks, blocks24bpp")
 end

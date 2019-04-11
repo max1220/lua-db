@@ -1,14 +1,12 @@
 #!/usr/bin/env luajit
 
+local ldb = require("lua-db")
 local sox = require("sox")
-local input = require("input")
+local input = require("lua-input")
 local time = require("time")
-local input_event_codes = require("input-event-codes")
 
 local function plot_samples(samples, max_width)
-	local ldb = require("ldb")
-	local braile = require("braile")
-	local term = require("term")
+	
 	local width = math.min(#samples, max_width or 150)
 	local height = 90
 	
@@ -21,8 +19,8 @@ local function plot_samples(samples, max_width)
 		db:set_line(i-1, last_sample, i, sample, 255,0,0,255)
 		last_sample = sample
 	end
-	local lines = braile.draw_db_precise(db, 1, true)
-	print(term.set_cursor(0,0) .. table.concat(lines, term.reset_color() .. "\n"))
+	local lines = ldb.braile.draw_db_precise(db, 1, true)
+	print(ldb.term.set_cursor(0,0) .. table.concat(lines, ldb.term.reset_color() .. "\n"))
 end
 
 
@@ -36,26 +34,26 @@ local frame_count = 256
 
 -- map a key to a configuration for the tone generator
 local mapping = {
-	[input_event_codes.KEY_Q] = { gen = snd:generate_sin(27), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_W] = { gen = snd:generate_sin(41), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_E] = { gen = snd:generate_sin(61), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_R] = { gen = snd:generate_sin(87), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_T] = { gen = snd:generate_sin(130), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_Y] = { gen = snd:generate_sin(196), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_U] = { gen = snd:generate_sin(329), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_I] = { gen = snd:generate_sin(440), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_O] = { gen = snd:generate_sin(659), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_P] = { gen = snd:generate_sin(987), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_Q] = { gen = snd:generate_sin(27), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_W] = { gen = snd:generate_sin(41), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_E] = { gen = snd:generate_sin(61), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_R] = { gen = snd:generate_sin(87), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_T] = { gen = snd:generate_sin(130), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_Y] = { gen = snd:generate_sin(196), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_U] = { gen = snd:generate_sin(329), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_I] = { gen = snd:generate_sin(440), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_O] = { gen = snd:generate_sin(659), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_P] = { gen = snd:generate_sin(987), buf = snd:empty_buffer(frame_count), index = 0},
 	
-	[input_event_codes.KEY_A] = { gen = snd:generate_square(41), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_S] = { gen = snd:generate_square(61), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_D] = { gen = snd:generate_square(87), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_F] = { gen = snd:generate_square(130), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_G] = { gen = snd:generate_square(196), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_H] = { gen = snd:generate_square(329), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_J] = { gen = snd:generate_square(440), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_K] = { gen = snd:generate_square(659), buf = snd:empty_buffer(frame_count), index = 0},
-	[input_event_codes.KEY_L] = { gen = snd:generate_square(987), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_A] = { gen = snd:generate_square(41), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_S] = { gen = snd:generate_square(61), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_D] = { gen = snd:generate_square(87), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_F] = { gen = snd:generate_square(130), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_G] = { gen = snd:generate_square(196), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_H] = { gen = snd:generate_square(329), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_J] = { gen = snd:generate_square(440), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_K] = { gen = snd:generate_square(659), buf = snd:empty_buffer(frame_count), index = 0},
+	[input.event_codes.KEY_L] = { gen = snd:generate_square(987), buf = snd:empty_buffer(frame_count), index = 0},
 }
 
 
@@ -73,7 +71,7 @@ while true do
 
 	local ev = input_dev:read()
 	while ev do
-	if ev.type == input_event_codes.EV_KEY then
+	if ev.type == input.event_codes.EV_KEY then
 			if mapping[ev.code] then
 				mapping[ev.code].active = (ev.value ~= 0)
 			end

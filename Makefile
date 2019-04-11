@@ -1,6 +1,6 @@
 CFLAGS = -O3 -fPIC -I/usr/include/lua5.1 -Wall -Wextra
 LIBS   = -shared -llua5.1 -lm
-TARGET = ldb.so
+TARGET = lua_db.so
 
 all: $(TARGET)
 
