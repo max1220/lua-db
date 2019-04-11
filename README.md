@@ -440,6 +440,7 @@ TODO
 -----
 
 document lua-db api part
+lua-db load from dump
 blocks: Use 1-bit encoding per char to double height resolution
 braile: different modes for drawing
 screenshots for github
