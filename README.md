@@ -24,6 +24,99 @@ Here is some basic documentation on these modules
 
 
 
+lua-db
+-------
+
+The main module, contains functions for handling drawbuffers. When loading this module, the other submodules are automatically loaded
+into the same table(e.g require("lua-db").bitmap ).
+
+
+Actually only exports the new function:
+
+	ldb.new(width, height) --> drawbuffer
+
+
+
+Each drawbuffer supports the following functions:
+
+
+
+	db:width() --> width
+
+	db:height() --> height
+
+Gets the dimensions of this drawbuffer.
+
+
+
+	db:bytes_len() --> len
+
+returns the ammount of data dump_data would return(width*height*4)
+
+
+
+	db:get_pixel(x,y) --> r,g,b,a
+
+	db:get_pixel(x,y,r,g,b,a)
+
+Gets or sets the pixel at x,y to r,g,b,a(0-255)
+
+
+
+	db:set_rectangle(x,y,w,h,r,g,b,a)
+
+Fills the rectangle defined by x,y,w,h with the color r,g,b,a(0-255)
+
+
+
+	db:set_box(x,y,w,h,r,g,b,a)
+
+Fills the outline of the rectangle defined by x,y,w,h with the color r,g,b,a(0-255)
+
+
+
+	db:set_line(x0,y0,x1,y1,r,g,b,a)
+
+Draws a line from x0,y0 to x1,y1 in the color r,g,b,a(0-255). Not aliased.
+
+
+
+	db:clear(r,g,b,a)
+
+Clears the contens of the drawbuffer, leaving the entire drawbuffer filled with r,g,b,a(0-255)
+
+
+
+	db:draw_to_drawbuffer(target_db, target_x, target_y, origin_x, origin_y, width, height, scale)
+
+Copy the content from db to target_db. target_x,target_y is the coordinate in the image that is beeing copied into.
+origin_x, origin_y is the coordinate from the source draw buffer. Width and height define how large a rectangle is
+copied from the source. if scale is > 1, then the image is drawn scaled to the target_db.
+
+
+
+	db:pixel_function(pixel_callback)
+	pixel_callback(x,y,r,g,b,a) --> r,g,b,a
+
+Calls the pixel_callback function for each pixel in the drawbuffer, setting the pixel to the returned value.
+Kind of slow due to Lua call overhead; Only use while loading/not during main game.
+
+
+
+	db:dump_data()
+
+Get the data from the drawbuffer as string(4byte r-g-b-a, left-to-right, top-to-bottom)
+
+
+
+	db:close()
+
+Close the drawbuffer, freeing memory
+
+
+
+
+
 ppm.lua - input/output as portable pixmap(.ppm)
 -----------------------------------------
 
@@ -346,6 +439,7 @@ sequences for more accurate colors.
 TODO
 -----
 
+document lua-db api part
 blocks: Use 1-bit encoding per char to double height resolution
 braile: different modes for drawing
 screenshots for github
