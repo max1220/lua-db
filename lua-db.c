@@ -65,6 +65,7 @@ static int ldb_bytelen(lua_State *L) {
 }
 
 static int ldb_dump_data(lua_State *L) {
+	//TODO: also do reverse, load data from a string
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -155,7 +156,6 @@ static int ldb_pixel_function(lua_State *L) {
 }
 
 // TODO: Implement diffrent blending diffrent than don't copy id a<1
-// TODO: Validate arguments better
 static int ldb_draw_to_drawbuffer(lua_State *L) {
 	drawbuffer_t *origin_db;
 	CHECK_DB(L, 1, origin_db)
@@ -171,21 +171,6 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 
 	int w = lua_tointeger(L, 7);
 	int h = lua_tointeger(L, 8);
-
-
-	// TODO
-	if ( (target_x < 0) || (target_x >= target_db->w) || (target_y < 0) || (target_y >= target_db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "target coordinates out of range");
-		return 2;
-	}
-	if ( (origin_x < 0) || (origin_x >= origin_db->w) || (origin_y < 0) || (origin_y >= origin_db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "origin coordinates out of range");
-		return 2;
-	}
-
-
 	
 	int scale = lua_tointeger(L, 9);
 
@@ -227,12 +212,6 @@ static int ldb_get_pixel(lua_State *L) {
 	int x = lua_tointeger(L, 2);
 	int y = lua_tointeger(L, 3);
 
-	if ( (x < 0) || (x >= db->w) || (y < 0) || (y >= db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "x or y out of bounds");
-		return 2;
-	}
-
 	pixel_t p = DB_GET_PX(db, x,y);
 
 	lua_pushinteger(L, p.r);
@@ -254,17 +233,12 @@ static int ldb_set_pixel(lua_State *L) {
 	int b = lua_tointeger(L, 6);
 	int a = lua_tointeger(L, 7);
 
-	if ( (x < 0) || (x >= db->w) || (y < 0) || (y >= db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "x or y out of bounds");
-		return 2;
-	}
-
 	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
 		lua_pushnil(L);
 		lua_pushstring(L, "invalid r,g,b,a value");
 		return 2;
 	}
+	
 
 	pixel_t p = {.r=r, .g=g, .b=b, .a=a};
 
@@ -287,21 +261,9 @@ static int ldb_set_rect(lua_State *L) {
 	int b = lua_tointeger(L, 8);
 	int a = lua_tointeger(L, 9);
 
-	if ( (x < 0) || (x >= db->w) || (y < 0) || (y >= db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "x or y out of bounds");
-		return 2;
-	}
-
 	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
 		lua_pushnil(L);
 		lua_pushstring(L, "invalid r,g,b,a value");
-		return 2;
-	}
-
-	if ( (w < 0) || (w+x > db->w) || (h < 0) || (h+y > db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "w or h out of bounds");
 		return 2;
 	}
 
@@ -333,22 +295,9 @@ static int ldb_set_box(lua_State *L) {
 	int b = lua_tointeger(L, 8);
 	int a = lua_tointeger(L, 9);
 
-
-	if ( (x < 0) || (x >= db->w) || (y < 0) || (y >= db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "x or y out of bounds");
-		return 2;
-	}
-
 	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
 		lua_pushnil(L);
 		lua_pushstring(L, "invalid r,g,b,a value");
-		return 2;
-	}
-
-	if ( (w < 0) || (w+x > db->w) || (h < 0) || (h+y > db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "w or h out of bounds");
 		return 2;
 	}
 
@@ -380,18 +329,6 @@ static int ldb_set_line(lua_State *L) {
 	int g = lua_tointeger(L, 7);
 	int b = lua_tointeger(L, 8);
 	int a = lua_tointeger(L, 9);
-
-	if ( (x0 < 0) || (x0 >= db->w) || (y0 < 0) || (y0 >= db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "x0 or y0 out of bounds");
-		return 2;
-	}
-
-	if ( (x1 < 0) || (x1 >= db->w) || (y1 < 0) || (y1 >= db->h) ) {
-		lua_pushnil(L);
-		lua_pushstring(L, "x1 or y1 out of bounds");
-		return 2;
-	}
 
 	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
 		lua_pushnil(L);
@@ -429,7 +366,6 @@ static int ldb_set_line(lua_State *L) {
 
 
 static int l_new(lua_State *L) {
-
 
 	uint16_t w = lua_tointeger(L, 1);
 	uint16_t h = lua_tointeger(L, 2);
@@ -490,7 +426,7 @@ static int l_new(lua_State *L) {
 
 
 /*
-LUALIB_API int luaopen_ldb(lua_State *L) {
+LUALIB_API int luaopen_db(lua_State *L) {
 	lua_newtable(L);
 
 	LUA_T_PUSH_S_S("version", VERSION)
