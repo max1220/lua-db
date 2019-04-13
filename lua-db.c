@@ -27,8 +27,8 @@
 #define LUA_T_PUSH_S_CF(S, CF) lua_pushstring(L, S); lua_pushcfunction(L, CF); lua_settable(L, -3);
 
 
-
 static int ldb_tostring(lua_State *L) {
+	// return a string with info about the drawbuffer to Lua
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -38,6 +38,7 @@ static int ldb_tostring(lua_State *L) {
 }
 
 static int ldb_width(lua_State *L) {
+	// return the width of a drawbuffer to Lua
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -47,6 +48,7 @@ static int ldb_width(lua_State *L) {
 }
 
 static int ldb_height(lua_State *L) {
+	// return the height of a drawbuffer to Lua
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -56,6 +58,7 @@ static int ldb_height(lua_State *L) {
 }
 
 static int ldb_bytelen(lua_State *L) {
+	// return length of pixel data in bytes to Lua
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -65,7 +68,10 @@ static int ldb_bytelen(lua_State *L) {
 }
 
 static int ldb_dump_data(lua_State *L) {
-	//TODO: also do reverse, load data from a string
+	// dump the pixel data from the drawbuffer as lua string.
+	// keep in mind that \000 in Lua strings is valid, and this function
+	// will return such strings if a pixel color value is 0.
+	// Pixel format if r,g,b,a(left-to-right, top-to-bottom), see lua-db.h
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -75,6 +81,8 @@ static int ldb_dump_data(lua_State *L) {
 }
 
 static int ldb_load_data(lua_State *L) {
+	// Load a string containing data for this drawbuffer.
+	// Format see ldb_dump_data. Must str must be w*h*4 characters long.
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 	
@@ -91,6 +99,8 @@ static int ldb_load_data(lua_State *L) {
 }
 
 static int ldb_close(lua_State *L) {
+	// close an instance of a drawbuffer, calling free() on the allocated
+	// memory, if needed. Automatically called by the Lua GC
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -103,6 +113,7 @@ static int ldb_close(lua_State *L) {
 }
 
 static int ldb_clear(lua_State *L) {
+	// clear the drawbuffer in a uniform color
 	drawbuffer_t *db = (drawbuffer_t *)lua_touserdata(L, 1);
 	CHECK_DB(L, 1, db)
 
@@ -135,6 +146,8 @@ static int ldb_clear(lua_State *L) {
 }
 
 static int ldb_pixel_function(lua_State *L) {
+	// call a Lua function for each pixel in the drawbuffer,
+	// setting the pixel to the return value of the Lua function.
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -179,8 +192,8 @@ static int ldb_pixel_function(lua_State *L) {
 	return 1;
 }
 
-// TODO: Implement diffrent blending than copy if a>0
 static int ldb_draw_to_drawbuffer(lua_State *L) {
+	// draws a drawbuffer to another drawbuffer
 	drawbuffer_t *origin_db;
 	CHECK_DB(L, 1, origin_db)
 
@@ -230,6 +243,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 }
 
 static int ldb_get_pixel(lua_State *L) {
+	// return the r,g,b,a values for the pixel at x,y in the drawbuffer
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -247,6 +261,7 @@ static int ldb_get_pixel(lua_State *L) {
 }
 
 static int ldb_set_pixel(lua_State *L) {
+	// set the pixel at x,y to r,g,b,a in the drawbuffer
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -273,6 +288,7 @@ static int ldb_set_pixel(lua_State *L) {
 }
 
 static int ldb_set_rect(lua_State *L) {
+	// fill the rectangle x,y,w,h in the drawbuffer with the color r,g,b,a
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -307,6 +323,7 @@ static int ldb_set_rect(lua_State *L) {
 }
 
 static int ldb_set_box(lua_State *L) {
+	// draw the outline of the rectangle x,y,w,h with r,g,b,a on the drawbuffer
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -341,6 +358,7 @@ static int ldb_set_box(lua_State *L) {
 }
 
 static int ldb_set_line(lua_State *L) {
+	// draw a line from x0,y0 to x1,y1 in r,g,b,a on the drawbuffer
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
@@ -390,16 +408,22 @@ static int ldb_set_line(lua_State *L) {
 
 
 static int l_new(lua_State *L) {
-
+	// create a new drawbuffer instance of the specified width, height
 	uint16_t w = lua_tointeger(L, 1);
 	uint16_t h = lua_tointeger(L, 2);
 	uint32_t len = w * h * sizeof(pixel_t);
 
+	// see lua-db.h
 	drawbuffer_t *db;
 
+	// we can store the pixel data in a memory region allocated with
+	// malloc, or store it directly in userdata memory. If we allocate
+	// memory using malloc, we also need to free() it later. See ldb_close()
 #ifdef ENABLE_DATA_IN_USERDATA
+	// allocate a userdata with enough space for the pixel data
 	db = (drawbuffer_t *)lua_newuserdata(L, sizeof(drawbuffer_t) + len);
 	// db->data = (pixel_t *) db+len;
+	// pixel data is at the end of the struct
 	db->data = (pixel_t *) db + sizeof(*db);
 #else
 	db = (drawbuffer_t *)lua_newuserdata(L, sizeof(drawbuffer_t));
@@ -417,6 +441,10 @@ static int l_new(lua_State *L) {
 		return 2;
 	}
 
+	// this creates or pushes the metatable for a drawbuffer on the Lua
+	// stack. Keep in mind that all drawbuffers have the same metatable,
+	// so directly putting strings/numbers etc. in this table for each
+	// drawbuffer does not work.
 	if (luaL_newmetatable(L, "drawbuffer")) {
 
 		lua_pushstring(L, "__index");
@@ -450,18 +478,9 @@ static int l_new(lua_State *L) {
 }
 
 
-/*
-LUALIB_API int luaopen_db(lua_State *L) {
-	lua_newtable(L);
 
-	LUA_T_PUSH_S_S("version", VERSION)
-	LUA_T_PUSH_S_CF("new", l_new)
-
-	return 1;
-}
-*/
-
-
+// this handles the call to require("lua-db.lua_db").
+// Lua removes the lua-prefix, and replaced non-ascii chars with _.
 LUALIB_API int luaopen_db_lua_db(lua_State *L) {
 	lua_newtable(L);
 
