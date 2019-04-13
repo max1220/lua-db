@@ -59,7 +59,7 @@ static int ldb_bytelen(lua_State *L) {
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
-	lua_pushinteger(L, db->w*db->h*sizeof(pixel_t));
+	lua_pushinteger(L, db->len);
 
 	return 1;
 }
@@ -69,15 +69,32 @@ static int ldb_dump_data(lua_State *L) {
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
-	lua_pushlstring(L, (char *) db->data, (size_t)db->w*db->h*4);
+	lua_pushlstring(L, (char *) db->data, db->len);
 
 	return 1;
+}
+
+static int ldb_load_data(lua_State *L) {
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+	
+	size_t str_len = 0;
+	const char* str = lua_tolstring(L, 2, &str_len);
+	
+	if (str_len == db->len) {	
+		for (size_t i=0; i<str_len; i++) {
+			db->data[i*4] = (pixel_t) { str[i], str[i+1], str[i+2], str[i+3] };
+		}
+	}
+	
+	return 0;
 }
 
 static int ldb_close(lua_State *L) {
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 
+// we only need to free if the data is not in the userdata object itself
 #ifndef ENABLE_DATA_IN_USERDATA
 	free(db->data);
 #endif
@@ -98,6 +115,13 @@ static int ldb_clear(lua_State *L) {
 		lua_pushnil(L);
 		lua_pushstring(L, "invalid r,g,b,a value");
 		return 2;
+	}
+	
+	// fast path for clear in uniform color
+	if ((r==g)&&(g==b)&&(b==a)) {
+		memset(db->data, r, db->len);
+		lua_pushboolean(L, 1);
+		return 1;
 	}
 
 	for (int y = 0; y < db->h; y=y+1) {
@@ -155,7 +179,7 @@ static int ldb_pixel_function(lua_State *L) {
 	return 1;
 }
 
-// TODO: Implement diffrent blending diffrent than don't copy id a<1
+// TODO: Implement diffrent blending than copy if a>0
 static int ldb_draw_to_drawbuffer(lua_State *L) {
 	drawbuffer_t *origin_db;
 	CHECK_DB(L, 1, origin_db)
@@ -412,6 +436,7 @@ static int l_new(lua_State *L) {
 		LUA_T_PUSH_S_CF("pixel_function", ldb_pixel_function)
 		LUA_T_PUSH_S_CF("close", ldb_close)
 		LUA_T_PUSH_S_CF("dump_data", ldb_dump_data)
+		LUA_T_PUSH_S_CF("load_data", ldb_load_data)
 
 		lua_settable(L, -3);
 
