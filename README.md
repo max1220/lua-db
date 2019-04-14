@@ -15,8 +15,12 @@ The framebuffer part of the lfb project will soon be implemented as a seperate c
 Due to now having a shared metatable, the width and height can no longer be stored in the metatable as integers.
 Instead, call the db:width() and db:height() functions
 
-
 This repository also contains a few usefull pure-lua libraries for handling graphics. (Some of them can be used without ldb)
+
+The seperate modules can be loaded individually, or together. For loading them together, just call require("lua-db").
+If you want to load them individually, use require("lua-db.module_name"), where module_name is the name of the module
+you want to load. The C part of the module is loaded using require("lua-db.lua_db"). Some of the Lua modules require this
+module.
 
 Here is some basic documentation on these modules
 
@@ -46,12 +50,6 @@ Each drawbuffer supports the following functions:
 	db:height() --> height
 
 Gets the dimensions of this drawbuffer.
-
-
-
-	db:bytes_len() --> len
-
-returns the ammount of data dump_data would return(width*height*4)
 
 
 
@@ -103,9 +101,21 @@ Kind of slow due to Lua call overhead; Only use while loading/not during main ga
 
 
 
-	db:dump_data()
+	db:dump_data() --> data
 
-Get the data from the drawbuffer as string(4byte r-g-b-a, left-to-right, top-to-bottom)
+Get the data from the drawbuffer as string(4byte r-g-b-a, left-to-right, top-to-bottom).
+
+
+
+	db:bytes_len() --> len
+
+returns the ammount of data dump_data would return(mostlye width*height*4)
+
+
+
+	db:load_data(data)
+
+Loads the the string data as pixel_data. Reverse of dump_data(). 
 
 
 
@@ -131,7 +141,13 @@ Decodes a .ppm from a string, calling pixel_callback for each pixel.
 
 	ppm.decode_from_string_drawbuffer(str) --> drawbuffer
 
-Decodes a .ppm from a string into a drawbuffer.
+Decodes a .ppm from a string into a new drawbuffer.
+
+
+
+	ppm.decode_from_file_drawbuffer(filepath) --> drawbuffer
+
+Decodes the .ppm file filepath into a new drawbuffer.
 
 
 
@@ -153,53 +169,55 @@ Encodes a new .ppm image from a drawbuffer.
 term.lua - handle terminal escape sequences
 --------------------------------------------
 
-utillities for working with terminal esacape sequences(Mostly ANSI)
+utillities for working with terminal esacape sequences(Mostly ANSI).
+They don't write the codes directly to the terminal, instead they return
+the code as string.
 
 
 
-	set_cursor(x, y)
+	term.set_cursor(x, y)  --> ansi
 
 Sets the current cursor position in the terminal. Starts at 0,0ds
 
 
 
-	get_screen_size()
+	term.get_screen_size() -->w,h
 
 gets the terminal screen size. Uses tput if aviable, bash variables otherwise
 
 
 
-	clear_screen()
+	term.clear_screen() --> ansi
 
 clears the screen and resets cursor position to 0,0
 
 
 
-	reset_color()
+	term.reset_color() --> ansi
 
 Resets the SGR parameters(foreground/background  color)
 
 
 
-	rgb_to_ansi_color_fg_24bpp(r, g, b)
+	term.rgb_to_ansi_color_fg_24bpp(r, g, b) --> ansi
 
 Convert the r,g,b(0-255) values to an ANSI escape sequence for setting the foreground color in 24-bit-color space
 
 
 
-	rgb_to_ansi_color_bg_24bpp(r, g, b)
+	term.rgb_to_ansi_color_bg_24bpp(r, g, b) --> ansi
 
 Convert the r,g,b(0-255) values to an ANSI escape sequence for setting the background color in 24-bit-color space
 
 
 
-	rgb_to_ansi_color_fg_216(r, g, b)
+	term.rgb_to_ansi_color_fg_216(r, g, b) --> ansi
 
 Convert the r,g,b(0-255) values to an ANSI escape sequence for setting the foreground color in 216-color space
 
 
 
-	rgb_to_ansi_color_bg_216(r, g, b)
+	term.rgb_to_ansi_color_bg_216(r, g, b) --> ansi
 
 Convert the r,g,b(0-255) values to an ANSI escape sequence for setting the background color in 216-color space
 
@@ -215,18 +233,19 @@ for each pixel.
 
 
 
-	draw_pixel_callback(width, height, pixel_callback)
+	draw_pixel_callback(width, height, pixel_callback) --> lines
 	pixel_callback(x, y) --> r,g,b
 
 Draw by calling a pixel callback with the coordinates for each pixel.
 The pixel callback takes x,y coordinates and should return r,g,b (0-255)
-values.
+values. The returned table lines contains the generated lines, and
+can be turned into a string by using table.concat(lines, term.reset_color .. "\n").
 
 
 
-	draw_db(db)
+	draw_db(db) --> lines
 
-Draws from a drawbuffer
+Draws from a drawbuffer. Same as above. Internally calls draw_pixel_callback
 
 
 
@@ -326,6 +345,12 @@ pixel_callback with the x,y coordinates and r,g,b values(0-255)
 
 Reads the bitmap file content in str, parses the header, and returns a
 drawbuffer that contains the pixel data from the bitmap
+
+
+
+	Bitmap.decode_from_file_drawbuffer(filepath)
+
+Return a drawbuffer with the image loaded from filepath
 
 
 
