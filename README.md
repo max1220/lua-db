@@ -464,28 +464,19 @@ sequences for more accurate colors.
 TODO
 -----
 
-document lua-db api part
-lua-db load from dump
-blocks: Use 1-bit encoding per char to double height resolution
-braile: different modes for drawing
-screenshots for github
-web output via http multipart + svg/bmp
-ffmpeg: documentation
-ffmpeg: sound?
-ffmpeg: use unix socket for data, stdin for control
-document sdl2fb
-test/document lua-vnc
-bitmap: support 32bpp encoding(directly from drawbuffer, via db:dump_data() and correct bitmask
-document sox.lua, example_sox
-
-
-(external) unified framwork for eventloop(input/output/timers), asset loading(fonts, sprites, etc.)
- - take code from ffmpeg example for multiple outputs
- - write code for input handling
-  - update lua-getch
-  - update lua-input(fix memory leak)
- - sound via sox
- 
+ - document lua-db api part
+ - lua-db load from dump
+ - blocks: Use 1-bit encoding per char to double height resolution
+ - braile: different modes for drawing
+ - screenshots for github
+ - web output via http multipart + svg/bmp
+ - ffmpeg: documentation
+ - ffmpeg: sound?
+ - ffmpeg: use unix socket for data, stdin for control
+ - document sdl2fb
+ - test/document lua-vnc
+ - bitmap: support 32bpp encoding(directly from drawbuffer, via db:dump_data() and correct bitmask
+ - document sox.lua, example_sox
 
 
 write tests
