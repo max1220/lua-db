@@ -90,8 +90,8 @@ static int ldb_load_data(lua_State *L) {
 	const char* str = lua_tolstring(L, 2, &str_len);
 	
 	if (str_len == db->len) {	
-		for (size_t i=0; i<str_len; i++) {
-			db->data[i*4] = (pixel_t) { str[i], str[i+1], str[i+2], str[i+3] };
+		for (size_t i=0; i<(str_len/4); i++) {
+			db->data[i] = (pixel_t) { str[i*4], str[i*4+1], str[i*4+2], str[i*4+3] };
 		}
 	}
 	
