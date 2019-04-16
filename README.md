@@ -467,6 +467,10 @@ TODO
  - documentation in seperate files, wiki
  - screenshots for github
  - web output via http multipart + svg/bmp
+ - tilemap librarie from engine
+  - load different map formats
+  - render selected layers
+  - caching?
  - ffmpeg
    - documentation
    - sound?
