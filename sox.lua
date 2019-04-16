@@ -27,7 +27,7 @@ function sox.open_command(sox_command, sample_rate)
 			return frames, frame_count+frame_index
 		end
 		
-		return generate_frames
+		return generate_frames, generate_frame
 		
 	end
 	
@@ -56,7 +56,7 @@ function sox.open_command(sox_command, sample_rate)
 			return frames, frame_count+frame_index
 		end
 		
-		return generate_frames
+		return generate_frames, generate_frame
 	end
 	
 	
@@ -84,6 +84,41 @@ function sox.open_command(sox_command, sample_rate)
 	end
 	
 	
+	-- return a player that can generate samples based on a set of notes
+	function sound:play_notes(list)
+		local _self = self
+		local player = {}
+		
+		local list_by_div = {}
+		for i, note_config in ipairs(list) do
+			
+		end
+		
+		
+		self.frame_index = 0
+		player.seconds_per_note = 1/8
+		function player:gen_samples(frame_count)
+			local samples_per_div = _self.sample_rate * self.seconds_per_note
+			local frames = {}
+			for i=0, frame_count-1 do
+				local cdiv_i = math.floor(i / samples_per_div)
+				local cdiv = list_by_div[cdiv]
+				local cframe = 0
+				for j, gen in ipairs(cdiv) do
+					cframe = cframe + gen(self.frame_index+i)
+				end
+				cframe = math.tanh(cframe)
+				self.frame_index = self.frame_index + 1
+				table.insert(frames, cframe)
+			end
+			return samples
+		end
+		
+		
+		return player
+	end
+	
+	
 	-- final step in output, mix multiple sample channels together and set their volumes
 	function sound:mix(channels, frame_count)
 		local out_samples = {}
@@ -99,7 +134,7 @@ function sox.open_command(sox_command, sample_rate)
 		end
 		for i=1, #out_samples do
 			--out_samples[i] = out_samples[i] / out_counts[i]
-			out_samples[i] = math.tanh(math.tanh(out_samples[i] * 0.9))
+			out_samples[i] = math.tanh(math.tanh(out_samples[i]))
 		end
 		return out_samples
 	end
@@ -145,6 +180,11 @@ function sox.open_default()
 	-- return sox.open_command("pv > /dev/null", 22050)
 end
 
+
+local ao
+function sox.play_using_ao()
+	ao = ao or require("")
+end
 
 
 return sox

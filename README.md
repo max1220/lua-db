@@ -483,6 +483,4 @@ TODO
    - imlib
    - tileset
    - raw
-
-
-write tests
+ - write tests
