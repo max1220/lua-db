@@ -460,10 +460,33 @@ sequences for more accurate colors.
 
 
 
+See Also
+---------
+
+libraries with lua-db support:
+
+	https://github.com/max1220/lua-fb
+	https://github.com/max1220/lua-sdl2fb
+	https://github.com/max1220/lua-vnc
+
+
+Applications:
+
+	https://github.com/max1220/engine
+	https://github.com/max1220/lua_fb_term (Currently defunct)
+
+
+Old(Now included in lua-db):
+
+	https://github.com/max1220/lfb
+	https://github.com/max1220/lua-bitmap
+
+
 
 TODO
 -----
 
+ - make lua-perlin use drawbuffers
  - documentation in seperate files, wiki
  - screenshots for github
  - web output via http multipart + svg/bmp
