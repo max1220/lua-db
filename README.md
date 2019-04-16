@@ -464,24 +464,25 @@ sequences for more accurate colors.
 TODO
 -----
 
+ - documentation in seperate files, wiki
  - screenshots for github
  - web output via http multipart + svg/bmp
  - ffmpeg
-  - documentation
-  - sound?
-  - use unix socket for data, stdin for control
+   - documentation
+   - sound?
+   - use unix socket for data, stdin for control
  - sdl2fb
-  - document 
+   - document 
  - lua-vnc
-  - test/document 
+   - test/document 
  - bitmap
-  - support 32bpp encoding(directly from drawbuffer, via db:dump_data(), add correct bitmask
+   - support 32bpp encoding(directly from drawbuffer, via db:dump_data(), add correct bitmask
  - document
-  - sox.lua
-  - example_sox
-  - imlib
-  - tileset
-  - raw
+   - sox.lua
+   - example_sox
+   - imlib
+   - tileset
+   - raw
 
 
 write tests
