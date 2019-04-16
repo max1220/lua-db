@@ -93,6 +93,8 @@ static int ldb_load_data(lua_State *L) {
 		for (size_t i=0; i<(str_len/4); i++) {
 			db->data[i] = (pixel_t) { str[i*4], str[i*4+1], str[i*4+2], str[i*4+3] };
 		}
+		lua_pushboolean(L, 1);
+		return 1;
 	}
 	
 	return 0;
