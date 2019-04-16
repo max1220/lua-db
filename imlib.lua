@@ -1,10 +1,10 @@
-local im = require("imlib2")
 local ldb = require("lua-db.lua_db")
 
 local imlib = {}
 
 -- glue code to load an image using imlib2
 function imlib.from_file(filepath)
+	local im = require("imlib2")
 	local img = assert(im.image.load(filepath))
 
 	local width = img:get_width()
