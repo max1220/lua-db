@@ -14,6 +14,9 @@ db.blocks = require("lua-db.blocks")
 db.font = require("lua-db.font")
 db.ffmpeg = require("lua-db.ffmpeg")
 db.term = require("lua-db.term")
+db.tileset = require("lua-db.tileset")
+db.imlib = require("lua-db.imlib")
+db.raw = require("lua-db.raw")
 
 
 
