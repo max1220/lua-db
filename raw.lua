@@ -25,6 +25,14 @@ function raw.decode_from_file_drawbuffer(filepath, width, height)
 end
 
 
+-- decode from a file into a new drawbuffer
+function raw.decode_from_file_drawbuffer(filepath, width, height)
+	local file = assert(io.open(filepath, "rb"))
+	local str = file:read("*a")
+	return raw.decode_from_string_drawbuffer(str, width, height)
+end
+
+
 -- drawbuffer to string(dump data)
 function raw.encode_from_drawbuffer(db)
 	local str = db:dump_data()
