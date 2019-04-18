@@ -96,8 +96,10 @@ static int ldb_load_data(lua_State *L) {
 		lua_pushboolean(L, 1);
 		return 1;
 	}
+	lua_pushnil(L);
+	lua_pushstring(L, "Invalid length");
 	
-	return 0;
+	return 2;
 }
 
 static int ldb_close(lua_State *L) {
