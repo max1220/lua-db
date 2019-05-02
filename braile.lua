@@ -1,4 +1,3 @@
-local utf8 = require("utf8")
 local term = require("lua-db.term")
 
 
@@ -35,8 +34,8 @@ end
 -- the pixel callback is called for every pixel(8x per character), takes an x,y coordinate, and should return 1 if the pixel is set, 0 otherwise
 -- the color callback is called for every character, takes an x,y coordinate, and should return an ANSI escape sequence to set the foreground/background color
 function Braile.draw_pixel_callback(width, height, pixel_callback, color_callback)
-	local chars_x = math.floor(width/2)-1
-	local chars_y = math.floor(height/4)-1
+	local chars_x = math.ceil(width/2)-1
+	local chars_y = math.ceil(height/4)-1
 	
 	-- iterate over every character that should be generated
 	local lines = {}
@@ -175,10 +174,14 @@ function Braile.draw_db_precise(db, threshold, bpp24)
 				end
 			end
 		end
-		avg_r = avg_r / i
-		avg_g = avg_g / i
-		avg_b = avg_b / i
-		return color_code_fg(avg_r, avg_g, avg_b)
+		if i > 0 then
+			avg_r = avg_r / i
+			avg_g = avg_g / i
+			avg_b = avg_b / i
+			return color_code_fg(avg_r, avg_g, avg_b)
+		else
+			return color_code_fg(0,0,0)
+		end
 	end
 	
 	local width = db:width()
