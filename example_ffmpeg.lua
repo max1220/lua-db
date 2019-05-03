@@ -13,7 +13,7 @@ local height = assert(tonumber(arg[3]), "Argument 3 should be a height(e.g. 1080
 local lfb, sdl2fb, braile, blocks
 local output
 if arg[4] == "sdl" then
-	sdl2fb = ldb.sdl2fb
+	sdl2fb = require("sdl2fb")
 elseif arg[4] == "fb" then
 	lfb = ldb.fb
 elseif arg[4] == "braile" then
