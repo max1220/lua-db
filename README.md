@@ -4,8 +4,6 @@ ldb - lua drawbuffers
 This project is a continuation of lfb, the lua framebuffer library.
 (Or at least the graphics buffer part of it)
 
-See the lfb readme for docu.
-
 This project was seperated because it could be usefull outside the framebuffer context.
 
 Additional tools, for example for reading/writing .bmp, .ppm, .pgm, .pbm files into drawbuffers will also be put here.
@@ -23,7 +21,7 @@ you want to load. The C part of the module is loaded using require("lua-db.lua_d
 module.
 
 Here is some basic documentation on these modules
-
+Some of the new features are still missing from the Documentation.
 
 
 
@@ -480,6 +478,14 @@ Old(Now included in lua-db):
 
 	https://github.com/max1220/lfb
 	https://github.com/max1220/lua-bitmap
+
+
+
+Video
+------
+
+There is a video of the example_3d.lua demo on [youtube](https://www.youtube.com/watch?v=xmY3oSsHM68):
+
 
 
 
