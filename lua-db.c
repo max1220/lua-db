@@ -222,15 +222,25 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 	
 	pixel_t p;
 
-	for (cy=0; cy < h; cy=cy+1) {
-		for (cx=0; cx < w; cx=cx+1) {
-			p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
-			if (p.a > 0) {
-				if (scale <= 1) {
+
+	if (scale <= 1) {
+		// draw unscaled
+		for (cy=0; cy < h; cy=cy+1) {
+			for (cx=0; cx < w; cx=cx+1) {
+				p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
+				if (p.a > 0) {
 					// draw unscaled
 					DB_SET_PX(target_db, (cx+target_x), (cy+target_y), p)
-				} else {
-					// draw scaled
+				}
+			}
+		}
+		
+	} else {
+		// draw scaled
+		for (cy=0; cy < h; cy=cy+1) {
+			for (cx=0; cx < w; cx=cx+1) {
+				p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
+				if (p.a > 0) {
 					p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
 					for (sy=0; sy < scale; sy=sy+1) {
 						for (sx=0; sx < scale; sx=sx+1) {
@@ -240,6 +250,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 				}
 			}
 		}
+		
 	}
 
 	lua_pushboolean(L, 1);
