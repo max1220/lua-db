@@ -141,7 +141,7 @@ static int ldb_clear(lua_State *L) {
 
 	for (int y = 0; y < db->h; y=y+1) {
 		for (int x = 0; x < db->w; x=x+1) {
-				db->data[y*db->w+x] = (pixel_t) {.r=r, .g=g, .b=b, .a=a};
+			db->data[y*db->w+x] = (pixel_t) {.r=r, .g=g, .b=b, .a=a};
 		}
 	}
 
@@ -420,6 +420,94 @@ static int ldb_set_line(lua_State *L) {
 	return 1;
 }
 
+float capsuleSDF(float px, float py, float ax, float ay, float bx, float by, float r) {
+    float pax = px - ax, pay = py - ay, bax = bx - ax, bay = by - ay;
+    float h = fmaxf(fminf((pax * bax + pay * bay) / (bax * bax + bay * bay), 1.0f), 0.0f);
+    float dx = pax - bax * h, dy = pay - bay * h;
+    return sqrtf(dx * dx + dy * dy) - r;
+}
+
+void alphablend(drawbuffer_t* db, int x, int y, float alpha, float r, float g, float b) {
+	if (alpha>0) {
+		pixel_t sp = DB_GET_PX(db, x, y)
+		pixel_t p = {
+			.r=sp.r*(1 - alpha) + r * alpha * 255,
+			.g=sp.g* (1 - alpha) + g * alpha * 255,
+			.b=sp.b* (1 - alpha) + b * alpha * 255,
+			.a=255
+		};
+		DB_SET_PX(db, x,y,p)
+    }
+}
+
+static int ldb_set_pixel_alphablend(lua_State *L) {
+	// set the pixel at x,y to r,g,b,a in the drawbuffer
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+
+	int x = lua_tointeger(L, 2);
+	int y = lua_tointeger(L, 3);
+	int r = lua_tointeger(L, 4);
+	int g = lua_tointeger(L, 5);
+	int b = lua_tointeger(L, 6);
+	int a = lua_tointeger(L, 7);
+
+	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
+		lua_pushnil(L);
+		lua_pushstring(L, "invalid r,g,b,a value");
+		return 2;
+	}
+
+	alphablend(db, x,y, (float)a/255.0f, (float)r/255.0f, (float)g/255.0f, (float)b/255.0f);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+void lineSDFAABB(drawbuffer_t* db, float x0, float y0, float x1, float y1, float radius, float r, float g, float b) {
+    int x_min = (int)floorf(fminf(x0, x1) - radius);
+    int x_max = (int) ceilf(fmaxf(x0, x1) + radius);
+    int y_min = (int)floorf(fminf(y0, y1) - radius);
+    int y_max = (int) ceilf(fmaxf(y0, y1) + radius);
+    for (int y = y_min; y <= y_max; y++) {
+		for (int x = x_min; x <= x_max; x++) {
+			alphablend(db, x, y, fmaxf(fminf(0.5f - capsuleSDF(x, y, x0, y0, x1, y1, radius), 1.0f), 0.0f), r,g,b);
+		}
+	}
+}
+
+static int ldb_set_line_anti_aliased(lua_State *L) {
+	// draw a line from x0,y0 to x1,y1 in r,g,b,a on the drawbuffer
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+
+	int x0 = lua_tonumber(L, 2);
+	int y0 = lua_tonumber(L, 3);
+	int x1 = lua_tonumber(L, 4);
+	int y1 = lua_tonumber(L, 5);
+
+	int ri = lua_tointeger(L, 6);
+	int gi = lua_tointeger(L, 7);
+	int bi = lua_tointeger(L, 8);
+	
+	float r = (float)ri/255.0f;
+	float g = (float)gi/255.0f;
+	float b = (float)bi/255.0f;
+	
+	float radius = lua_tonumber(L, 9);
+
+	if ( (r < 0) || (g < 0) || (b < 0) || (r > 255) || (g > 255) || (b > 255) ) {
+		lua_pushnil(L);
+		lua_pushstring(L, "invalid r,g,b,a value");
+		return 2;
+	}
+
+	lineSDFAABB(db, x0,y0,x1,y1,radius,r,g,b);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
 
 
 static int l_new(lua_State *L) {
@@ -471,9 +559,11 @@ static int l_new(lua_State *L) {
 
 		LUA_T_PUSH_S_CF("get_pixel", ldb_get_pixel)
 		LUA_T_PUSH_S_CF("set_pixel", ldb_set_pixel)
+		LUA_T_PUSH_S_CF("set_pixel_alphablend", ldb_set_pixel_alphablend)
 		LUA_T_PUSH_S_CF("set_rectangle", ldb_set_rect)
 		LUA_T_PUSH_S_CF("set_box", ldb_set_box)
 		LUA_T_PUSH_S_CF("set_line", ldb_set_line)
+		LUA_T_PUSH_S_CF("set_line_anti_aliased", ldb_set_line_anti_aliased)
 		LUA_T_PUSH_S_CF("clear", ldb_clear)
 		LUA_T_PUSH_S_CF("draw_to_drawbuffer", ldb_draw_to_drawbuffer)
 		LUA_T_PUSH_S_CF("pixel_function", ldb_pixel_function)
