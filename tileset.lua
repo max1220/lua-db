@@ -26,9 +26,9 @@ function Tileset.new(db, tile_w, tile_h)
 	end
 	
 	-- draw a single tile
-	function tileset.draw_tile(target_db, x,y,tile_id)
-		local source_x, source_y = unpack(assert(tiles[tile_id]))
-		db:draw_to_drawbuffer(target_db, x,y, source_x, source_y, tile_w, tile_h)
+	function tileset.draw_tile(target_db, x,y,tile_id,scale)
+		local source_x, source_y = tiles[tile_id][1], tiles[tile_id][2]
+		db:draw_to_drawbuffer(target_db, x,y, source_x, source_y, tile_w, tile_h, scale)
 	end
 	
 	return tileset
