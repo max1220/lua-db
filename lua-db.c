@@ -576,9 +576,7 @@ static int ldb_set_line_anti_aliased(lua_State *L) {
 }
 
 static void set_vline(drawbuffer_t* db, int y, float x1, float x2, pixel_t p) {
-	printf("set_vline %d %f %f\n", y,x1,x2);
 	for (int cx= (x1 < x2 ? x1 : x2); cx<=(x1 > x2 ? x1 : x2); cx++) {
-		printf("  set %d\n", cx);
 		DB_SET_PX(db, cx,y, p)
 	}
 }
@@ -653,18 +651,12 @@ static int ldb_fill_triangle(lua_State *L) {
 	
 	if (y1==y2) {
 		fill_triangle_bottom(db, x0,y0, x1,y1, x2,y2, p);
-		printf("bottom      : (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x0,y0, x1,y1, x2,y2);
 	} else if (y0==y1) {
 		fill_triangle_top(db, x0,y0, x1,y1, x2,y2, p);
-		printf("top         : (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x0,y0, x1,y1, x2,y2);
 	} else {
 		split = (int)(x0 + ((float)(y1 - y0) / (float)(y2 - y0)) * (x2 - x0));
-		
 		fill_triangle_bottom(db, x0,y0, x1,y1, split,y1, p);
-		printf("split bottom: (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x0,y0, x1,y1, split,y1);
-		
 		fill_triangle_top(db, x1,y1, split,y1, x2,y2, p);
-		printf("split top   : (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x1,y1, split,y1, x2,y2);
 	}
 	
 	return 0;
