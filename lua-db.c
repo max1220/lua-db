@@ -80,9 +80,9 @@ static int ldb_dump_data(lua_State *L) {
 	return 1;
 }
 
-static int ldb_load_data(lua_State *L) {
+static int ldb_load_data_rgba(lua_State *L) {
 	// Load a string containing data for this drawbuffer.
-	// Format see ldb_dump_data. Must str must be w*h*4 characters long.
+	// Format is rgba, like dump_data. Must str must be w*h*4 characters long.
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
 	
@@ -92,6 +92,74 @@ static int ldb_load_data(lua_State *L) {
 	if (str_len == db->len) {	
 		for (size_t i=0; i<(str_len/4); i++) {
 			db->data[i] = (pixel_t) { str[i*4], str[i*4+1], str[i*4+2], str[i*4+3] };
+		}
+		lua_pushboolean(L, 1);
+		return 1;
+	}
+	lua_pushnil(L);
+	lua_pushstring(L, "Invalid length");
+	
+	return 2;
+}
+
+static int ldb_load_data_bgra(lua_State *L) {
+	// Load a string containing data for this drawbuffer.
+	// Format is bgra. Must str must be w*h*4 characters long.
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+	
+	size_t str_len = 0;
+	const char* str = lua_tolstring(L, 2, &str_len);
+	
+	if (str_len == db->len) {	
+		for (size_t i=0; i<(str_len/4); i++) {
+			db->data[i] = (pixel_t) { str[i*4+2], str[i*4+1], str[i*4+0], str[i*4+3] };
+		}
+		lua_pushboolean(L, 1);
+		return 1;
+	}
+	lua_pushnil(L);
+	lua_pushstring(L, "Invalid length");
+	
+	return 2;
+}
+
+static int ldb_load_data_rgb(lua_State *L) {
+	// Load a string containing data for this drawbuffer.
+	// Format is rgb. Must str must be w*h*3 characters long.
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+	size_t str_len = 0;
+	const char* str = lua_tolstring(L, 2, &str_len);
+	
+	if (str_len == db->w * db->h * 3) {	
+		for (size_t i=0; i<(str_len/3); i++) {
+			db->data[i] = (pixel_t) { str[i*3+2], str[i*3+1], str[i*3+0], 255 };
+		}
+		lua_pushboolean(L, 1);
+		return 1;
+	}
+	lua_pushnil(L);
+	lua_pushstring(L, "Invalid length");
+	
+	return 2;
+}
+
+static int ldb_load_data_rgba_nonzeroalpha(lua_State *L) {
+	// Load a string containing data for this drawbuffer.
+	// Format is rgba. Must str must be w*h*4 characters long.
+	// ignores pixels whos alpha value is 0
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+	
+	size_t str_len = 0;
+	const char* str = lua_tolstring(L, 2, &str_len);
+	
+	if (str_len == db->len) {	
+		for (size_t i=0; i<(str_len/4); i++) {
+			if (str[i*4+3] != 0) {
+				db->data[i] = (pixel_t) { str[i*4], str[i*4+1], str[i*4+2], str[i*4+3] };
+			}
 		}
 		lua_pushboolean(L, 1);
 		return 1;
@@ -292,7 +360,6 @@ static int ldb_set_pixel(lua_State *L) {
 		lua_pushstring(L, "invalid r,g,b,a value");
 		return 2;
 	}
-	
 
 	pixel_t p = {.r=r, .g=g, .b=b, .a=a};
 
@@ -431,9 +498,9 @@ void alphablend(drawbuffer_t* db, int x, int y, float alpha, float r, float g, f
 	if (alpha>0) {
 		pixel_t sp = DB_GET_PX(db, x, y)
 		pixel_t p = {
-			.r=sp.r*(1 - alpha) + r * alpha * 255,
-			.g=sp.g* (1 - alpha) + g * alpha * 255,
-			.b=sp.b* (1 - alpha) + b * alpha * 255,
+			.r=sp.r * (1 - alpha) + r * alpha * 255,
+			.g=sp.g * (1 - alpha) + g * alpha * 255,
+			.b=sp.b * (1 - alpha) + b * alpha * 255,
 			.a=255
 		};
 		DB_SET_PX(db, x,y,p)
@@ -508,7 +575,100 @@ static int ldb_set_line_anti_aliased(lua_State *L) {
 	return 1;
 }
 
+static void set_vline(drawbuffer_t* db, int y, float x1, float x2, pixel_t p) {
+	printf("set_vline %d %f %f\n", y,x1,x2);
+	for (int cx= (x1 < x2 ? x1 : x2); cx<=(x1 > x2 ? x1 : x2); cx++) {
+		printf("  set %d\n", cx);
+		DB_SET_PX(db, cx,y, p)
+	}
+}
 
+static void fill_triangle_top(drawbuffer_t* db, float x1, float y1, float x2, float y2, float x3, float y3, pixel_t p) {
+	// fill the flat(at the top) triangle. vertice y must be ascending.
+	float slope1 = (x3-x1)/(y3-y1);
+	float slope2 = (x3-x2)/(y3-y2);
+	float cx1 = x3;
+	float cx2 = x3;
+		
+	for (int cy=y3; cy>y1; cy--) {
+		set_vline(db, cy, cx1, cx2, p);
+		cx1 -= slope1;
+		cx2 -= slope2;
+	}
+}
+
+static void fill_triangle_bottom(drawbuffer_t* db, float x1, float y1, float x2, float y2, float x3, float y3, pixel_t p) {
+	// fill the flat(at the bottom) triangle. vertice y must be ascending.
+	float slope1 = (x2-x1) / (y2-y1);
+	float slope2 = (x3-x1) / (y3-y1);
+	float cx1 = x1;
+	float cx2 = x1;
+		
+	for (int cy=y1; cy<=y2; cy++) {
+		set_vline(db, cy, cx1, cx2, p);
+		
+		cx1 += slope1;
+		cx2 += slope2;
+	}
+}
+
+static int ldb_fill_triangle(lua_State *L) {
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+	
+	int x0 = lua_tointeger(L, 2);
+	int y0 = lua_tointeger(L, 3);
+	int x1 = lua_tointeger(L, 4);
+	int y1 = lua_tointeger(L, 5);
+	int x2 = lua_tointeger(L, 6);
+	int y2 = lua_tointeger(L, 7);
+	int r = lua_tointeger(L, 8);
+	int g = lua_tointeger(L, 9);
+	int b = lua_tointeger(L, 10);
+	int a = lua_tointeger(L, 11);
+	int split;
+
+	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
+		lua_pushnil(L);
+		lua_pushstring(L, "invalid r,g,b,a value");
+		return 2;
+	}
+
+	pixel_t p = {.r=r, .g=g, .b=b, .a=a};
+
+	// sort by y(y1 is smallest)
+	int tmp_x, tmp_y;
+	if (y0 > y2) {
+		tmp_x = x0; x0 = x2; x2 = tmp_x;
+		tmp_y = y0; y0 = y2; y2 = tmp_y;
+	}
+	if (y0 > y1) {
+		tmp_x = x0; x0 = x1; x1 = tmp_x;
+		tmp_y = y0; y0 = y1; y1 = tmp_y;
+	}
+	if (y1 > y2) {
+		tmp_x = x1; x1 = x2; x2 = tmp_x;
+		tmp_y = y1; y1 = y2; y2 = tmp_y;
+	}
+	
+	if (y1==y2) {
+		fill_triangle_bottom(db, x0,y0, x1,y1, x2,y2, p);
+		printf("bottom      : (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x0,y0, x1,y1, x2,y2);
+	} else if (y0==y1) {
+		fill_triangle_top(db, x0,y0, x1,y1, x2,y2, p);
+		printf("top         : (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x0,y0, x1,y1, x2,y2);
+	} else {
+		split = (int)(x0 + ((float)(y1 - y0) / (float)(y2 - y0)) * (x2 - x0));
+		
+		fill_triangle_bottom(db, x0,y0, x1,y1, split,y1, p);
+		printf("split bottom: (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x0,y0, x1,y1, split,y1);
+		
+		fill_triangle_top(db, x1,y1, split,y1, x2,y2, p);
+		printf("split top   : (%.4d %.4d) (%.4d %.4d) (%.4d %.4d)\n", x1,y1, split,y1, x2,y2);
+	}
+	
+	return 0;
+}
 
 static int l_new(lua_State *L) {
 	// create a new drawbuffer instance of the specified width, height
@@ -569,7 +729,12 @@ static int l_new(lua_State *L) {
 		LUA_T_PUSH_S_CF("pixel_function", ldb_pixel_function)
 		LUA_T_PUSH_S_CF("close", ldb_close)
 		LUA_T_PUSH_S_CF("dump_data", ldb_dump_data)
-		LUA_T_PUSH_S_CF("load_data", ldb_load_data)
+		LUA_T_PUSH_S_CF("load_data", ldb_load_data_rgba)
+		LUA_T_PUSH_S_CF("load_data_rgba", ldb_load_data_rgba)
+		LUA_T_PUSH_S_CF("load_data_rgba_nonzeroalpha", ldb_load_data_rgba_nonzeroalpha)
+		LUA_T_PUSH_S_CF("load_data_bgra", ldb_load_data_bgra)
+		LUA_T_PUSH_S_CF("load_data_rgb", ldb_load_data_rgb)
+		LUA_T_PUSH_S_CF("fill_triangle", ldb_fill_triangle)
 
 		lua_settable(L, -3);
 
