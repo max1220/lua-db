@@ -5,18 +5,26 @@ local term = require("lua-db.term")
 local Braile = {}
 
 
--- convert a unicode codepoint to utf8 character sequence
-local function unicode_to_utf8(c)
-	-- from https://gist.github.com/pygy/7154512
-	assert((55296 > c or c > 57343) and c < 1114112, "Bad Unicode code point: "..c..".")
-	if c < 128 then
-		return string.char(c)
-	elseif c < 2048 then
-		return string.char(192 + c/64, 128 + c%64)
-	elseif c < 55296 or 57343 < c and c < 65536 then
-		return string.char(224 + c/4096, 128 + c/64%64, 128 + c%64)
-	elseif c < 1114112 then
-		return string.char(240 + c/262144, 128 + c/4096%64, 128 + c/64%64, 128 + c%64)
+
+
+local unicode_to_utf8
+if utf8 then
+	-- lua 5.3 has built-in function for this
+	unicode_to_utf8 = utf8.char
+else
+	-- convert a unicode codepoint to utf8 character sequence
+	unicode_to_utf8 = function(c)
+		-- from https://gist.github.com/pygy/7154512
+		assert((55296 > c or c > 57343) and c < 1114112, "Bad Unicode code point: "..c..".")
+		if c < 128 then
+			return string.char(c)
+		elseif c < 2048 then
+			return string.char(192 + c/64, 128 + c%64)
+		elseif c < 55296 or 57343 < c and c < 65536 then
+			return string.char(224 + c/4096, 128 + c/64%64, 128 + c%64)
+		elseif c < 1114112 then
+			return string.char(240 + c/262144, 128 + c/4096%64, 128 + c/64%64, 128 + c%64)
+		end
 	end
 end
 
@@ -34,8 +42,8 @@ end
 -- the pixel callback is called for every pixel(8x per character), takes an x,y coordinate, and should return 1 if the pixel is set, 0 otherwise
 -- the color callback is called for every character, takes an x,y coordinate, and should return an ANSI escape sequence to set the foreground/background color
 function Braile.draw_pixel_callback(width, height, pixel_callback, color_callback)
-	local chars_x = math.ceil(width/2)-1
-	local chars_y = math.ceil(height/4)-1
+	local chars_x = math.ceil(width/2)
+	local chars_y = math.ceil(height/4)
 	
 	-- iterate over every character that should be generated
 	local lines = {}
@@ -67,6 +75,8 @@ function Braile.draw_pixel_callback(width, height, pixel_callback, color_callbac
 			
 			if char_num == 0 then
 				--empty char, use space
+				--table.insert(cline, Braile.get_chars(2^math.random(1,7)))
+				--table.insert(cline, Braile.get_chars(1))
 				table.insert(cline, " ")
 			else
 				-- generate a utf8 character sequence for the braile code
