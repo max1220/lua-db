@@ -13,22 +13,15 @@ db:fill_triangle(0,h, w,h, w/2,h/2, 0,0,64,255)
 db:fill_triangle(0,0, w,0, w/2,h/2, 64,0,64,255)
 
 db:set_rectangle(30,10,10,10,255,255,255,255)
-db:set_rectangle(30,30,10,10,255,0,0,255)
-db:set_rectangle(30,50,10,10,0,255,0,255)
-db:set_rectangle(30,70,10,10,0,0,255,255)
+db:set_rectangle(10,30,10,10,255,0,0,255)
+db:set_rectangle(10,50,10,10,0,255,0,255)
+db:set_rectangle(10,70,10,10,0,0,255,255)
 db:set_rectangle(50,10,10,10,127,127,127,255)
-
 
 db:set_box(70,10,10,10,255,255,255,255)
 db:set_line(0,0,w-1,h-1,255,255,255,255)
 
-db:set_line_anti_aliased(0,0,w-1,h/2,255,255,255,2)
-
-
-
+db:set_line_anti_aliased(0,0,w,h,255,255,255,2.5)
 
 local lines = ldb.braile.draw_db_precise(db, 0, true)
--- print(ldb.term.set_cursor(0,0))
-for i, line in ipairs(lines) do
-	print(line .. ldb.term.reset_color())
-end
+print(table.concat(lines, ldb.term.reset_color().."\n"))
