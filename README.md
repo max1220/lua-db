@@ -523,23 +523,23 @@ sequences for more accurate colors.
 
 	sudo ./example_3d.lua /dev/input/event0 320 240
 
-	Starts the 3D example. The first argument should be a keyboard device.
-	Requires lua-input, lua-sdl2fb. 
+Starts the 3D example. The first argument should be a keyboard device.
+Requires lua-input, lua-sdl2fb. 
 
 
 
 	./example_gol.lua
 
-	Starts the Conway's Game of Life example. Fills the screen with
-	random, then iterates using the game of life ruleset.
+Starts the Conway's Game of Life example. Fills the screen with
+random, then iterates using the game of life ruleset.
 
 
 
 	sudo ./example_sox.lua /dev/input/event0
-	
-	Implements a simple sound synthesis. Requires lua-input and sox.
-	Play sine waves using keys q,w,e,r,t,z,u,i,o,p, and square waves
-	using a,s,d,f,g,h,j,k,l.
+
+Implements a simple sound synthesis. Requires lua-input and sox.
+Play sine waves using keys q,w,e,r,t,z,u,i,o,p, and square waves
+using a,s,d,f,g,h,j,k,l.
 
 
 
