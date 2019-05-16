@@ -486,6 +486,10 @@ Gets the rendered dimensions of the string using the specified max_width.
 Examples
 ---------
 
+Some of these examples might require some of my other libraries. See below.
+
+
+
 	./example_drawing.lua
 
 Draws basic geometry on a drawbuffer, then outputs using blocks.lua.
@@ -549,6 +553,8 @@ libraries with lua-db support:
 	https://github.com/max1220/lua-fb
 	https://github.com/max1220/lua-sdl2fb
 	https://github.com/max1220/lua-vnc
+	https://github.com/max1220/lua-input
+	https://github.com/max1220/lua-perlin
 
 
 Applications:
