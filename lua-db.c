@@ -634,7 +634,7 @@ static int ldb_fill_triangle(lua_State *L) {
 
 	pixel_t p = {.r=r, .g=g, .b=b, .a=a};
 
-	// sort by y(y1 is smallest)
+	// sort by y(y0 is smallest)
 	int tmp_x, tmp_y;
 	if (y0 > y2) {
 		tmp_x = x0; x0 = x2; x2 = tmp_x;
@@ -648,6 +648,12 @@ static int ldb_fill_triangle(lua_State *L) {
 		tmp_x = x1; x1 = x2; x2 = tmp_x;
 		tmp_y = y1; y1 = y2; y2 = tmp_y;
 	}
+	
+	// check if triangle is visible
+	if (((y0 < 0) && (y2 < 0)) || ((y0 >= db->h) && (y2 >= db->h))) {
+		return 0;
+	}
+	
 	
 	if (y1==y2) {
 		fill_triangle_bottom(db, x0,y0, x1,y1, x2,y2, p);
