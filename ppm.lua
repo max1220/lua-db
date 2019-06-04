@@ -51,14 +51,18 @@ end
 
 -- encode a .ppm based on a width, height and pixel_callback
 function ppm.encode_from_pixel_callback(width, height, pixel_callback)
-	local ppm_data = {}
+	local ppm_data = {
+		"P3",
+		width .. " " .. height,
+		255
+	}
 	for y=0, height-1 do
 		local cline = {}
 		for x=0, width-1 do
 			local r,g,b = pixel_callback(x,y)
 			table.insert(cline, ("%.3d %.3d %.3d"):format(r,g,b))
 		end
-		table.insert(ppm_data, table.concat(cline, "\t"))
+		table.insert(ppm_data, table.concat(cline, "\n"))
 	end
 	
 	return table.concat(ppm_data, "\n")
@@ -70,12 +74,12 @@ function ppm.encode_from_drawbuffer(db)
 	local width = db:width()
 	local height = db:height()
 	
-	local bitmap = Bitmap.encode_from_pixel_callback(width, height, function(x,y)
+	local ppm = ppm.encode_from_pixel_callback(width, height, function(x,y)
 		local r,g,b = db:get_pixel(x,y)
 		return r,g,b
 	end)
 	
-	return bitmap
+	return ppm
 end
 
 
