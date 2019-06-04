@@ -19,7 +19,7 @@
 #include "lua-db.h"
 
 
-#define VERSION "2.0"
+#define VERSION "2.1"
 
 #define LUA_T_PUSH_S_N(S, N) lua_pushstring(L, S); lua_pushnumber(L, N); lua_settable(L, -3);
 #define LUA_T_PUSH_S_I(S, N) lua_pushstring(L, S); lua_pushinteger(L, N); lua_settable(L, -3);
@@ -282,6 +282,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 	int h = lua_tointeger(L, 8);
 	
 	int scale = lua_tointeger(L, 9);
+	int ignorealpha = lua_toboolean(L, 10);
 
 	int cx;
 	int cy;
@@ -290,14 +291,14 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 	
 	pixel_t p;
 
+	// todo: fastpath for same width and ignorealpha set(use memcpy) and scale==1
 
 	if (scale <= 1) {
 		// draw unscaled
 		for (cy=0; cy < h; cy=cy+1) {
 			for (cx=0; cx < w; cx=cx+1) {
 				p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
-				if (p.a > 0) {
-					// draw unscaled
+				if ((p.a > 0) || ignorealpha) {
 					DB_SET_PX(target_db, (cx+target_x), (cy+target_y), p)
 				}
 			}
@@ -308,8 +309,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 		for (cy=0; cy < h; cy=cy+1) {
 			for (cx=0; cx < w; cx=cx+1) {
 				p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
-				if (p.a > 0) {
-					p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
+				if ((p.a > 0) || ignorealpha) {
 					for (sy=0; sy < scale; sy=sy+1) {
 						for (sx=0; sx < scale; sx=sx+1) {
 							DB_SET_PX(target_db, (cx*scale+sx+target_x), (cy*scale+sy+target_y), p)

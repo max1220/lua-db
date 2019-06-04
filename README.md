@@ -116,11 +116,12 @@ Clears the contens of the drawbuffer, leaving the entire drawbuffer filled with 
 
 
 
-	db:draw_to_drawbuffer(target_db, target_x, target_y, origin_x, origin_y, width, height, scale)
+	db:draw_to_drawbuffer(target_db, target_x, target_y, origin_x, origin_y, width, height, scale, ignorealpha)
 
 Copy the content from db to target_db. target_x,target_y is the coordinate in the image that is beeing copied into.
 origin_x, origin_y is the coordinate from the source draw buffer. Width and height define how large a rectangle is
-copied from the source. if scale is > 1, then the image is drawn scaled to the target_db.
+copied from the source. if scale is > 1, then the image is drawn scaled to the target_db. Only copies pixels from
+the source db if the alpha value is > 0, or always if ignorealpha is set.
 
 
 
