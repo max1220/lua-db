@@ -1,6 +1,5 @@
 #!/usr/bin/env luajit
 local ldb = require("lua-db")
-local input = require("lua-input")
 local time = require("time")
 local sdl2fb = require("sdl2fb")
 local perlin = require("perlin")
