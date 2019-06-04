@@ -4,37 +4,19 @@ local time = require("time")
 local sdl2fb = require("sdl2fb")
 
 
-
--- get parameters
-local w = tonumber(arg[1]) or 160
-local h = tonumber(arg[2]) or 120
-local scale = tonumber(arg[3]) or 3
-
--- create SDL window
-local sdlfb = sdl2fb.new(w*scale, h*scale, "3D example")
-
--- create db for rendering
-local db = ldb.new(w,h)
-db:clear(0,0,0,0)
-
--- if we need to scale, also create a db with the scaled dimensions
-local db_scaled
-if scale > 1 then
-	db_scaled = ldb.new(w*scale,h*scale)
-end
-
-
 -- add the offset to each point
 local function translate_points(points, dx,dy,dz, new_points)
 	local new_points = new_points or {}
 	
+	local j = 1
 	for i=1, #points do
 		local point = points[i]
 		if not point then break end
 		local x,y,z,data = point[1], point[2], point[3], point[4]
 		new_points[i] = { x+dx, y+dy, z+dz, data }
+		j = j + 1
 	end
-	new_points[#points + 1] = nil
+	new_points[j] = nil
 	
 	return new_points
 end
@@ -44,6 +26,7 @@ end
 local function rotate_points_xz(points, angle, new_points)
 	local new_points = new_points or {}
 
+	local j = 1
 	for i=1, #points do
 		local point = points[i]
 		if not point then break end
@@ -51,15 +34,16 @@ local function rotate_points_xz(points, angle, new_points)
 		local new_x = x * math.cos(angle) - z * math.sin(angle)
 		local new_z = x * math.sin(angle) + z * math.cos(angle)
 		new_points[i] = {new_x,y,new_z, data}
+		j = j + 1
 	end
-	new_points[#points + 1] = nil
+	new_points[j] = nil
 
 	return new_points
 end
 
 
 -- camera is always at origin(0,0,0)
-local function project_3d_to_2d(points_3d, points_2d, fill)
+local function project_3d_to_2d(points_3d, points_2d, ar, fill)
 	local points_2d = points_2d or {}
 
 	local j = 1
@@ -69,7 +53,7 @@ local function project_3d_to_2d(points_3d, points_2d, fill)
 		local x,y,z,data = point[1], point[2], point[3], point[4]
 		local f = 1
 		local px = x*(f/z)
-		local py = y*(f*(w/h)/z)
+		local py = y*(f*ar/z)
 		
 		if (f/z) < 0 then
 			-- point is in front of the camera
@@ -120,7 +104,7 @@ local function draw_objects(db, objects)
 
 	-- draw a single line
 	local function set_line(db, x1,y1,x2,y2,r,g,b,a,dist)
-		db:set_line(x1,y1,x2,y2,r,g,b,0.5)
+		db:set_line(x1,y1,x2,y2,r,g,b,a)
 	end
 
 	-- draws a triangle on the screen
@@ -128,8 +112,8 @@ local function draw_objects(db, objects)
 		db:fill_triangle(x1,y1,x2,y2,x3,y3,r,g,b,a)
 	end
 
-	local _w = w
-	local _h = h
+	local _w = db:width()
+	local _h = db:height()
 	local _floor = math.floor
 
 	for i=1, #objects do
@@ -150,8 +134,8 @@ local function draw_objects(db, objects)
 				
 			end
 		elseif object.type == "triangles" then
-			local hw = w/2
-			local hh = h/2
+			local hw = _w/2
+			local hh = _h/2
 			local colors = object._colors or object.colors
 			local points_2d = object.points_2d
 			for i=1, #object.points_2d, 3 do
@@ -173,7 +157,7 @@ local function draw_objects(db, objects)
 				--set_line(db, x1*hw+hw,y1*hh+hh, x3*hw+hw,y3*hh+hh, 255,0,255,255)
 				
 			end
-		elseif object.type == "line" then
+		elseif object.type == "lines" then
 			for i=1, #object.points_2d, 2 do
 				local color = object.colors[(i-1)/2+1] or {255,0,255,255}
 				local point_a = object.points_2d[i]
@@ -187,6 +171,8 @@ local function draw_objects(db, objects)
 				set_line(db, x1,y1, x2,y2)
 				
 			end
+		else
+			print("unknown obj", object.type)
 		end
 		
 	end
@@ -219,6 +205,57 @@ local function object_cube_points(x,y,z,w,h,d,r,g,b)
 	
 	local cube_obj = {
 		type = "points",
+		color = { r,g,b,255 },
+		position = { x,y,z },
+		dimensions = { w,h,d },
+		points = cube_points
+	}
+	
+	return cube_obj
+end
+local function object_cube_lines(x,y,z,w,h,d,r,g,b)
+	local x = assert(tonumber(x))
+	local y = assert(tonumber(y))
+	local z = assert(tonumber(z))
+	local w = assert(tonumber(w))
+	local h = assert(tonumber(h))
+	local d = assert(tonumber(d))
+	
+	local hw = w/2
+	local hh = h/2
+	local hd = d/2
+	
+	local cube_points = {
+		{ -hw, -hh, -hd },
+		{  hw, -hh, -hd },
+		{ -hw, -hh, -hd },
+		{ -hw,  hh, -hd },
+		{ -hw,  hh, -hd },
+		{  hw,  hh, -hd },
+		{  hw,  hh, -hd },
+		{  hw, -hh, -hd },
+
+		{ -hw, -hh,  hd },
+		{  hw, -hh,  hd },
+		{ -hw, -hh,  hd },
+		{ -hw,  hh,  hd },
+		{ -hw,  hh,  hd },
+		{  hw,  hh,  hd },
+		{  hw,  hh,  hd },
+		{  hw, -hh,  hd },
+
+		{ -hw, -hh, -hd },
+		{ -hw, -hh,  hd },
+		{  hw, -hh, -hd },
+		{  hw, -hh,  hd },
+		{ -hw,  hh, -hd },
+		{ -hw,  hh,  hd },
+		{  hw,  hh, -hd },
+		{  hw,  hh,  hd },
+	}
+	
+	local cube_obj = {
+		type = "lines",
 		color = { r,g,b,255 },
 		position = { x,y,z },
 		dimensions = { w,h,d },
@@ -436,7 +473,6 @@ local function backface_culling(points, colors, new_points, new_colors)
 		local center_z = (point_a_z + point_b_z + point_c_z) / 3
 		local center_len = math.sqrt(center_x^2 + center_y^2 + center_z^2)
 		
-		
 		local dotp = (normal_x/normal_len)*(center_x/center_len)+(normal_y/normal_len)*(center_y/center_len)+(normal_z/normal_len)*(center_z/center_len)
 		if dotp <= 0 then
 			new_points[i] = point_a
@@ -451,8 +487,42 @@ local function backface_culling(points, colors, new_points, new_colors)
 end
 
 
+-- resort points of a triangle
+local function resort_triangles(points, colors, new_points, new_colors)
+	local new_points = new_points or {}
+	local new_colors = new_colors or {}
+
+	local tmp_points = {}
+	for i=1, #points, 3 do
+		local point_a = points[i+0]
+		local point_b = points[i+1]
+		local point_c = points[i+2]
+		if not (point_a and point_b and point_c) then break end
+		
+		local color = colors[(i-1)/3+1]
+		local z = math.min(point_a[3], point_b[3], point_c[3])
+		table.insert(tmp_points, {z, point_a, point_b, point_c, color})
+	end
+	table.sort(tmp_points, function(a,b)
+		return a[1] < b[1]
+	end)
+	local j = 1
+	for i=1, #tmp_points do
+		new_points[j+0] = tmp_points[i][2]
+		new_points[j+1] = tmp_points[i][3]
+		new_points[j+2] = tmp_points[i][4]
+		new_colors[(j-1)/3+1] = tmp_points[i][5]
+		j = j + 3
+	end
+	new_points[j] = nil
+	-- new_colors[j] = nil
+	
+	return new_points, new_colors
+end
+
+
 -- get 2d points from 3d points for each object
-local function objects_to_screen(objects, cx,cy,cz,r)
+local function objects_to_screen(objects, cx,cy,cz,r, ar)
 	for i=1, #objects do
 		local object = objects[i]
 		
@@ -479,7 +549,6 @@ local function objects_to_screen(objects, cx,cy,cz,r)
 			end
 		end
 		
-		
 		-- translate global coordinates to camera coordinates
 		translate_points(points_cache, cx, cy, cz, points_cache)
 		
@@ -488,15 +557,17 @@ local function objects_to_screen(objects, cx,cy,cz,r)
 		
 		-- project 3d points to 2d screen points with color information
 		if object.type == "points" then
-			project_3d_to_2d(points_cache, points_2d)
+			project_3d_to_2d(points_cache, points_2d, ar)
 		elseif object.type == "triangles" then
 			-- remove surfaces not pointed towards the camera(Because afterwards some triangles have been removed, the indexes in colors have also changed
-			local colors = object.colors
-			local _, new_colors = backface_culling(points_cache, colors, points_cache)
-			object._colors = new_colors
+			local _, tmp_colors = backface_culling(points_cache, object.colors, points_cache, object._colors)
+			
+			-- resort points_cache by z(also changes color indexes)
+			local _, sort_colors = resort_triangles(points_cache, tmp_colors, points_cache)
+			object._colors = sort_colors
 			
 			-- triangles require the length of points to remain the same after clipping
-			project_3d_to_2d(points_cache, points_2d, true)
+			project_3d_to_2d(points_cache, points_2d, ar, true)
 		end
 		
 		object.points_cache = points_cache
@@ -505,6 +576,26 @@ local function objects_to_screen(objects, cx,cy,cz,r)
 	end
 		
 	return _points_2d
+end
+
+
+
+-- get parameters
+local w = tonumber(arg[1]) or 160
+local h = tonumber(arg[2]) or 120
+local scale = tonumber(arg[3]) or 3
+
+-- create SDL window
+local sdlfb = sdl2fb.new(w*scale, h*scale, "3D example")
+
+-- create db for rendering
+local db = ldb.new(w,h)
+db:clear(0,0,0,0)
+
+-- if we need to scale, also create a db with the scaled dimensions
+local db_scaled
+if scale > 1 then
+	db_scaled = ldb.new(w*scale,h*scale)
 end
 
 
@@ -539,7 +630,7 @@ end
 
 
 -- scale and draw to SDL
-local function output_db(db, set_cursor)
+local function output_db(db)
 	if scale > 1 then
 		db_scaled:clear(0,0,0,0)
 		db:draw_to_drawbuffer(db_scaled, 0,0,0,0,w,h,scale, false)
@@ -559,6 +650,8 @@ local objects = {}
 -- cube centered at 0,0,0 in pink
 --table.insert(objects, object_cube_points(0,0,0,1,1,1,255,0,255))
 
+
+
 -- coordinate points
 local a,b,c,d,e,f = object_coordinate_marker(50, 1)
 table.insert(objects, a)
@@ -567,6 +660,11 @@ table.insert(objects, c)
 table.insert(objects, d)
 table.insert(objects, e)
 table.insert(objects, f)
+
+
+
+table.insert(objects, object_cube_lines(0,0,0,1,1,1,255,0,255))
+
 
 
 -- test triangle and plane
@@ -622,10 +720,10 @@ local function down(camera, dt, speed)
 	camera.y = camera.y - dt*speed
 end
 local function left(camera, dt, speed)
-	camera.y = camera.y - dt*speed
+	camera.r_xz = camera.r_xz - dt*speed
 end
 local function right(camera, dt, speed)
-	camera.y = camera.y - dt*speed
+	camera.r_xz = camera.r_xz + dt*speed
 end
 
 
@@ -702,7 +800,7 @@ while true do
 	update(dt)
 	
 	-- calculate 2d screen positions for each object
-	points_2d = objects_to_screen(objects, camera.x, camera.y, camera.z, camera.r_xz)
+	points_2d = objects_to_screen(objects, camera.x, camera.y, camera.z, camera.r_xz, w/h)
 	
 	-- draw each object to the drawbuffer
 	draw_objects(db, objects)
@@ -710,7 +808,7 @@ while true do
 	-- draw to sdl
 	output_db(db, true)
 	
-	io.write(("FPS: %8.2f    \r"):format(1/dt))
+	-- io.write(("FPS: %8.2f    \r"):format(1/dt))
 end
 
 
