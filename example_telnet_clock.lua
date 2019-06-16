@@ -8,6 +8,7 @@ local timeout = 0.3
 local max_recv_buf = 16
 local max_line_len = 1024
 local clock_w, clock_h = 100, 100
+local port = 1234
 local clock_db = ldb.new(clock_w, clock_h)
 local clock_data
 local clock_index = 0
@@ -88,31 +89,15 @@ local function connection_update(self)
 	log_debug("connection update for socket", self.socket, #self.receive)
 
 	if self.first then
-		if clock_index ~= self.clock_index then
-			log_debug("resending clock data")
-			local str = {
-				ldb.term.set_cursor(self.offset_x or 0,self.offset_y or 0),
-				clock_data,
-				"\n"
-			}
-			if self.color then
-				local r,g,b = unpack(self.color)
-				table.insert(str, 1, ldb.term.rgb_to_ansi_color_fg_216(r,g,b))
-			end
-			if self.text then
-				table.insert(str, " " .. os.date() .. "              ")
-			end
-			
-			table.insert(self.send, table.concat(str))
-			self.clock_index = clock_index
-		end
-		
 		for i, line in ipairs(self.receive) do
 			if line == "hello" then
 				table.insert(self.send, "\nHello!\n")
-			elseif line:match("^offset (%d+) (%d+)$") then
-				local ox, oy = line:match("^offset (%d+)$")
-				self.offset_x = tonumber(oy)
+			elseif line == "cursor" then
+				if self.send_cursor then
+					self.send_cursor = false
+				else
+					self.send_cursor = true
+				end
 			elseif line:match("^color (%d+) (%d+) (%d+)$") then
 				local r,g,b = line:match("^color (%d+) (%d+) (%d+)$")
 				r = tonumber(r)
@@ -129,13 +114,55 @@ local function connection_update(self)
 				end
 			elseif line:match("^close$") then
 				self.close = true
+			elseif line:match("^GET /(.-) HTTP/1.1$") then
+				self.http = true
+			else
+				log_debug(("Unknown line: %q"):format(line))
 			end
 		end
+		
+		
+		if clock_index ~= self.clock_index then
+			log_debug("resending clock data")
+			if self.http then
+				if self.sent_headers then
+					local data = clock_data:gsub(" ","&#x2800;"):gsub("\n","<br>")
+					local body = "<!DOCTYPE html><pre style=\"font-family: monospace;\">" .. data .. "</pre>"
+					
+					--table.insert(self.send, "--##########\nContent-Type: text/html; charset=utf-8\nContent-Length: " .. #body .. ";\n\n")
+					
+					table.insert(self.send, "--##########\nContent-Type: text/html; charset=utf-8\n\n")
+					table.insert(self.send, body)
+					table.insert(self.send, "\n\n")
+					
+					--self.close = true
+				else
+					self.send = {"HTTP/1.1 200 OK\nContent-Type: multipart/x-mixed-replace; boundary=\"##########\"\n\n"}
+					self.sent_headers = true
+				end
+			else
+				local data = clock_data.."\n"
+				if self.text then
+					data = data .. "\n" .. os.date() .. "     "
+				end
+				if self.color then
+					local r,g,b = unpack(self.color)
+					data = ldb.term.rgb_to_ansi_color_fg_216(r,g,b) .. data
+				end
+				if self.send_cursor then
+					data = ldb.term.set_cursor(0,0) .. data
+				end
+				table.insert(self.send, data)
+			end
+			
+			self.clock_index = clock_index
+		end
+		
+		
 		
 		-- we have handled all data
 		self.receive = {}
 	else
-		table.insert(self.send, "Hello World!\n")
 		self.first = true
 	end
 end
@@ -168,13 +195,14 @@ local function add_client_socket(client_socket)
 	connection.update = connection_update
 	connection.close = false
 	connection.closed = false
+	connection.send_cursor = true
 	
 	table.insert(connections, connection)
 	connections[client_socket] = connection
 end
 
 
-local server = socket.bind("127.0.0.1", 1234)
+local server = socket.bind("127.0.0.1", port)
 server:settimeout(timeout)
 
 log_info("Entering main loop")
