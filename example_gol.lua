@@ -1,16 +1,7 @@
 #!/usr/bin/env luajit
 local ldb = require("lua-db")
 
-local gen = 0
 local function gol_step(state_db, new_db)
-	-- set the cell in the new state
-	local function set_px(x,y, alive)
-		if alive then
-			new_db:set_pixel(x,y,255,255,255,255)
-		else
-			new_db:set_pixel(x,y,0,0,0,0)
-		end
-	end
 
 	-- returns 1 if the cell at x,y is alive, 0 otherwise
 	local function is_set(x,y)
@@ -37,29 +28,27 @@ local function gol_step(state_db, new_db)
 				-- cell alive
 				if sum < 2 then
 					-- dies of underpopulation
-					set_px(x,y,false)
+					new_db:set_pixel(x,y,0,0,0,0)
 				elseif sum == 2 or sum == 3 then
 					-- keep alive
-					set_px(x,y,true)
+					new_db:set_pixel(x,y,255,255,255,255)
 				else
 					-- dies of overpopulation
-					set_px(x,y,false)
+					new_db:set_pixel(x,y,0,0,0,0)
 				end
 			else
 				-- cell dead
 				if sum == 3 then
 					-- spawn new
-					set_px(x,y,true)
+					new_db:set_pixel(x,y,255,255,255,255)
 				else
 					-- stay dead
-					set_px(x,y,false)
+					new_db:set_pixel(x,y,0,0,0,0)
 				end
 			end
 			
 		end
 	end
-	
-	gen = gen + 1
 end
 
 
@@ -74,26 +63,47 @@ local function random_fill(db)
 end
 
 
-local sw,sh = ldb.term.get_screen_size()
-local w = tonumber(arg[1]) or (sw*2-2)
-local h = tonumber(arg[2]) or (sh*4-4)
-local cstate = ldb.new(w,h)
-local nstate = ldb.new(w,h)
-random_fill(cstate)
+if arg then
+	-- interactive, run demo
 
-
-while true do
-	-- run a game of life step
-	gol_step(cstate, nstate)
+	local sw,sh = ldb.term.get_screen_size()
+	local w = sw
+	local h = sh-1
+	if arg[1] == "braile" then
+		w = tonumber(arg[1]) or (sw*2-2)
+		h = tonumber(arg[2]) or (sh*4-4)
+	end
 	
-	-- swap references to drawbuffers
-	local tmp = cstate
-	cstate = nstate
-	nstate = tmp
+	local cstate = ldb.new(w,h)
+	local nstate = ldb.new(w,h)
+	random_fill(cstate)
+	
+	local gen = 0
+	
+	while true do
+		-- run a game of life step
+		gol_step(cstate, nstate)
+		gen = gen + 1
+		
+		-- swap references to drawbuffers
+		local tmp = cstate
+		cstate = nstate
+		nstate = tmp
 
-	-- draw current iteratiom on screen
-	local lines = ldb.braile.draw_db(cstate, 0)
-	io.write(ldb.term.set_cursor(0,0))
-	io.write(table.concat(lines, ldb.term.reset_color() .. "\n"))
-	io.write( ldb.term.reset_color(), "\ngen: " .. gen .. "       \n")
+		-- draw current iteratiom on screen
+		local lines = ldb.blocks.draw_db(cstate, 0)
+		io.write(ldb.term.set_cursor(0,0))
+		io.write(table.concat(lines, ldb.term.reset_color() .. "\n"))
+		io.write( ldb.term.reset_color(), "\ngen: " .. gen .. "       ")
+	end
+	
+else
+
+	-- non-interactive, return table
+	return {
+		step = gol_step
+	}
 end
+
+
+
