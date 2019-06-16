@@ -70,8 +70,8 @@ if arg then
 	local w = sw
 	local h = sh-1
 	if arg[1] == "braile" then
-		w = tonumber(arg[1]) or (sw*2-2)
-		h = tonumber(arg[2]) or (sh*4-4)
+		w = (sw*2-2)
+		h = (sh*4-8)
 	end
 	
 	local cstate = ldb.new(w,h)
@@ -91,7 +91,12 @@ if arg then
 		nstate = tmp
 
 		-- draw current iteratiom on screen
-		local lines = ldb.blocks.draw_db(cstate, 0)
+		local lines
+		if arg[1] == "braile" then
+			lines = ldb.braile.draw_db(cstate, 0)
+		else
+			lines = ldb.blocks.draw_db(cstate, 0)
+		end
 		io.write(ldb.term.set_cursor(0,0))
 		io.write(table.concat(lines, ldb.term.reset_color() .. "\n"))
 		io.write( ldb.term.reset_color(), "\ngen: " .. gen .. "       ")
