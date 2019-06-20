@@ -1,5 +1,5 @@
-local function new_tetris()
-	local tiles = {
+local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
+	local tiles = tiles or {
 		{
 			{ 0,0,0,0 },
 			{ 0,1,1,0 },
@@ -38,20 +38,20 @@ local function new_tetris()
 		},
 	}
 	
-
-	local board_w = 10
-	local board_h = 16
-	local tile_w = 4
-	local tile_h = 4
-	local spawn_x = 4
+	local board_w = board_w or 10
+	local board_h = board_h or 16
+	local tile_w = tile_w or 4
+	local tile_h = tile_h or 4
+	local spawn_x = spawn_x or 4
 
 	local tetris = {
 		board_w = board_w,
 		board_h = board_h,
 		tile_w = tile_w,
 		tile_h = tile_h,
+		spawn_x = spawn_x,
+		tiles = tiles
 	}
-	tetris.tiles = tiles
 
 	-- return the tile_id from the board at x,y (return nil if out of range)
 	local function _get_at(self,x,y)
@@ -349,12 +349,6 @@ end
 
 
 
-if arg then
-	-- called interactively
-	run()
-else
-	-- called from require()
-	return {
-		new_tetris = new_tetris
-	}
-end
+return {
+	new_tetris = new_tetris
+}
