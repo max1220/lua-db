@@ -83,7 +83,9 @@ while true do
 	
 	-- read frame & render to drawbuffer
 	local frame = video:read_frame()
-	video:draw_frame_to_db(target_db, frame)
+	if frame then
+		video:draw_frame_to_db(target_db, frame)
+	end
 	
 	-- update sdl output & handle sdl events
 	if sdl then
