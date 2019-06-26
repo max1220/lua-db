@@ -52,13 +52,24 @@ function Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 	end
 	
 	-- draws a single character from the font
-	function font:draw_character(target_db, char_id, x, y)
+	function font:draw_character(target_db, char_id, x, y, color)
 		local source_x, source_y = unpack(assert(self.chars[char_id]))
-		self.db:draw_to_drawbuffer(target_db, x, y, source_x, source_y, char_w, char_h, scale)
+		if color then
+			for oy=0, self.char_h-1 do
+				for ox=0, self.char_w-1 do
+					local r,g,b,a = self.db:get_pixel(source_x+ox,source_y+oy)
+					if a > 0 then
+						target_db:set_pixel(x+ox,y+oy, color[1], color[2], color[3], color[4])
+					end
+				end
+			end
+		else
+			self.db:draw_to_drawbuffer(target_db, x, y, source_x, source_y, char_w, char_h, scale)
+		end
 	end
 	
 	-- draws a string. If max_width is provided, the string is split into multiple lines using str_split_lines
-	function font:draw_string(target_db, str, x, y, max_width)
+	function font:draw_string(target_db, str, x, y, max_width, color)
 		if max_width then
 			local lines = self:str_split_lines(str, max_width)
 			for oy, line in ipairs(lines) do
@@ -66,7 +77,7 @@ function Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 			end
 		else
 			for i=1, #str do
-				self:draw_character(target_db, str:byte(i), x+(i-1)*char_w*scale, y)
+				self:draw_character(target_db, str:byte(i), x+(i-1)*char_w*scale, y, color)
 			end
 		end
 	end
