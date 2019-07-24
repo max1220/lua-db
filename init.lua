@@ -11,13 +11,14 @@ db.bitmap = require("lua-db.bitmap")
 db.ppm = require("lua-db.ppm")
 db.braile = require("lua-db.braile")
 db.blocks = require("lua-db.blocks")
+db.halfblocks = require("lua-db.halfblocks")
 db.font = require("lua-db.font")
 db.ffmpeg = require("lua-db.ffmpeg")
 db.term = require("lua-db.term")
 db.tileset = require("lua-db.tileset")
 db.imlib = require("lua-db.imlib")
 db.raw = require("lua-db.raw")
-
+db.input_output = require("lua-db.input_output")
 
 
 return db
