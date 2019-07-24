@@ -6,22 +6,20 @@ local Blocks = {}
 -- simple module for color bitmap output on the terminal using space characters
 
 
--- get an ANSI escape sequence for setting the background color(r,g,b: 0-255) in a 216-color space
-Blocks.get_color_code_bg = term.rgb_to_ansi_color_bg_216
-
-
 -- draw using a space character with colored background for each pixel returned by pixel_callback
-function Blocks.draw_pixel_callback(width, height, pixel_callback)
+function Blocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
 	local lines = {}
 	for y=0, height-1 do
 		local cline = {}
 		for x=0, width-1 do
 			local r,g,b,_char = pixel_callback(x,y)
-			local char = _char or " "
-			if r and g and b then
-				char = Blocks.get_color_code_bg(r,g,b) .. char
-			else
-				char = "\027[0m" .. char
+			local char = "\027[0m "
+			if _char then
+				char = _char
+			elseif r and g and b and bpp24 then
+				char = term.rgb_to_ansi_color_bg_24bpp(r,g,b) .. " "
+			elseif r and g and b then
+				char = term.rgb_to_ansi_color_bg_216(r,g,b) .. " "
 			end
 			cline[x+1] = char
 		end
@@ -32,21 +30,31 @@ end
 
 
 -- utillity function to draw from a drawbuffer(calls draw_pixel_callback)
-function Blocks.draw_db(db)
-	
+function Blocks.draw_db(db, bpp24)
+
 	-- only return r,g,b if a>0, so the for a=0 the default terminal background is used
 	local function pixel_callback(x, y)
 		local r,g,b,a = db:get_pixel(x,y)
 		if a > 0 then
-			return r,g,b
+			local char = " "
+			if ((r+g+b)/3) > 192 then
+				char = "#"
+			elseif ((r+g+b)/3) > 96 then
+				char = "*"
+			end
+			if bpp24 then
+				return term.rgb_to_ansi_color_bg_24bpp(r,g,b) .. char
+			else
+				return term.rgb_to_ansi_color_bg_216(r,g,b) .. char
+			end
 		end
 	end
-	
+
 	-- draw using the pixel-callback
 	local width = db:width()
 	local height = db:height()
-	return Blocks.draw_pixel_callback(width, height, pixel_callback)
-	
+	return Blocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
+
 end
 
 
