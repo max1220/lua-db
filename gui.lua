@@ -82,9 +82,10 @@ function gui.new_surface(config)
 	local surface = gui.new_element(config)
 	surface.type = "surface"
 	surface.scale = scale
+	surface.db = db
 	function surface:on_draw(target_db)
 		local x,y = self:get_position()
-		db:draw_to_drawbuffer(target_db, x,y, 0,0, self.width,self.height, self.scale)
+		self.db:draw_to_drawbuffer(target_db, x,y, 0,0, self.width,self.height, self.scale)
 	end
 	return surface
 end
@@ -141,7 +142,7 @@ function gui.new_group(config)
 	-- forward mouse events
 	function group:handle_mouse_event(x,y, event)
 		local ox,oy = self:get_position()
-		return gui.handle_mouse_event(self.elements, x+ox,y+oy, event)
+		return not gui.handle_mouse_event(self.elements, x+ox,y+oy, event)
 	end
 	
 	-- forward key events
@@ -166,19 +167,28 @@ function gui.new_button(config)
 	button.type = "button"
 	button.text = text
 	button.on_click = config.on_click
+	button.on_mouse_enter = config.on_mouse_enter
+	button.on_mouse_leave = config.on_mouse_leave
 	
 	button.background_color = config.background_color or {64,64,64,255}
 	button.border_top_left_color = config.border_top_left_color or {224,224,224,255}
 	button.border_bottom_right_color = config.border_bottom_right_color or {128,128,128,128}
-		
+	
+	button.background_color_hover = config.background_color_hover or {64,64,96,255}
+	
 	function button:on_draw(target_db)
 		local x,y = self:get_position()
 		local bg = self.background_color
 		local b_tl = self.border_top_left_color
 		local b_br = self.border_bottom_right_color
-		if bg then
+		local bg_hover = self.background_color_hover
+		
+		if self.mouse_in_element and bg_hover then
+			target_db:set_rectangle(x, y, self.width-1, self.height-1, bg_hover[1], bg_hover[2], bg_hover[3], bg_hover[4])
+		elseif bg then
 			target_db:set_rectangle(x, y, self.width-1, self.height-1, bg[1], bg[2], bg[3], bg[4])
 		end
+		
 		if b_br then
 			target_db:set_line(x+self.width-1, y, x+self.width-1, y+self.height-1, b_br[1], b_br[2], b_br[3], b_br[4])
 			target_db:set_line(x, y+self.height-1, x+self.width-1, y+self.height-1, b_br[1], b_br[2], b_br[3], b_br[4])
