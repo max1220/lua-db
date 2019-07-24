@@ -5,7 +5,7 @@ local window_manager = {}
 function window_manager.new_window_group(config)
 	local elements = config.elements
 	local style = config.style
-	
+
 	local function remove_from_t(t, e)
 		for i=1, #t do
 			if t[i] == e then
@@ -14,7 +14,7 @@ function window_manager.new_window_group(config)
 			end
 		end
 	end
-	
+
 	local function make_draggable_callback()
 		local down
 		local function handle_mouse_event(self, x,y,ev,rx,ry)
@@ -42,7 +42,7 @@ function window_manager.new_window_group(config)
 		end
 		return handle_mouse_event
 	end
-	
+
 	local function make_resizeable_callback()
 		local down
 		local function handle_mouse_event(self, x,y,ev)
@@ -77,11 +77,11 @@ function window_manager.new_window_group(config)
 	local function unpack_color(color)
 		return color[1], color[2], color[3], color[4]
 	end
-	
+
 	local function unpack_color_3(color, ...)
 		return color[1], color[2], color[3], ...
 	end
-	
+
 	-- load style
 	local default_titlebar_background_color = style.default_titlebar_background_color or {64,64,64,255}
 	local default_titlebar_border_color = style.default_titlebar_border_color or {128,128,128,255}
@@ -92,7 +92,7 @@ function window_manager.new_window_group(config)
 	local default_titlebar_button_background_color = style.default_titlebar_button_background_color or {160,160,160,255}
 	local default_titlebar_button_line_color = style.default_titlebar_button_line_color or {224,64,64}
 	local default_titlebar_focus_background_color = style.default_titlebar_focus_background_color or {64,64,128,255}
-	
+
 	-- this function creates a titlebar element for a window element and attaches it to the window
 	local function titlebar_for_window(window)
 		local titlebar_background_color = window.titlebar_background_color or default_titlebar_background_color
@@ -100,7 +100,7 @@ function window_manager.new_window_group(config)
 		local titlebar_border_color = window.titlebar_border_color or default_titlebar_border_color
 		local titlebar_button_background_color = window.titlebar_button_background_color or default_titlebar_button_background_color
 		local titlebar_button_line_color = window.titlebar_button_line_color or default_titlebar_button_line_color
-		
+
 		local titlebar_e = gui.new_callback({
 			x = window.x - 1,
 			y = window.y - titlebar_height,
@@ -110,6 +110,7 @@ function window_manager.new_window_group(config)
 		function titlebar_e:callback(db, ox,oy)
 			local bg_color = self.window.focus and titlebar_focus_background_color or titlebar_background_color
 			db:set_rectangle(ox+1,oy+1,self.width-2, self.height-2, unpack_color(bg_color))
+			--db:set_line_anti_aliased(ox+1,oy+1+(self.height-2)/2, ox+self.width-1, oy+1+(self.height-2)/2, bg_color[1], bg_color[2], bg_color[3],10)
 			db:set_box(ox,oy, self.width,self.height, unpack_color(titlebar_border_color))
 			titlebar_font:draw_string(db, self.window.title or "Unnamed window", ox+5,oy+6)
 			db:set_rectangle(math.floor(ox+self.width-titlebar_height+1),oy+1,titlebar_height-2, titlebar_height-2, unpack_color(titlebar_button_background_color))
@@ -144,13 +145,13 @@ function window_manager.new_window_group(config)
 
 	-- this will hold a list of elements that will get drawn as the contents of windows
 	local windows = {}
-	
+
 	-- a list of titlebars
 	local titlebars = {}
-	
+
 	-- the list that will contain all windows and titlebars
 	local elements_list = {}
-	
+
 	-- ẃindow functions
 	function windows:focus(window)
 		for i,_window in ipairs(self) do
@@ -209,20 +210,20 @@ function window_manager.new_window_group(config)
 		element.rollup = function(self) windows:rollup(self) end
 		element.rolldown = function(self) windows:rolldown(self) end
 		element.close = function(self) windows:remove_window(self) end
-		
+
 		-- add titlebar
 		local titlebar = titlebar_for_window(element)
 		titlebar.window = element
 		element.titlebar = titlebar
 		element.is_window = true
-		
+
 		table.insert(titlebars, titlebar)
 		table.insert(windows, element)
 		table.insert(elements_list, titlebar)
 		table.insert(elements_list, element)
 		return element, titlebar
 	end
-	
+
 
 	-- make a window from each supplied element
 	for i, element in ipairs(elements) do
@@ -232,32 +233,32 @@ function window_manager.new_window_group(config)
 	-- the group that will be returned
 	config.elements = elements_list
 	local windows_e = gui.new_group(config)
-	
+
 	-- this function will be called for content element to draw the border of the window, and determine if the window gets drawn
 	function windows_e:on_draw_element(element, target_db)
 		-- draw window decoration
 		if not element.is_window then
 			return true
 		end
-		
+
 		local x,y = element:get_position()
 		local window_border_color = element.border_color or default_window_border_color
 		local window_background_color = element.background_color or default_window_background_color
-		
+
 		-- window background
 		if window_background_color then
 			target_db:set_rectangle(x,y,element.width, element.height, window_background_color[1], window_background_color[2], window_background_color[3], window_background_color[4])
 		end
-		
+
 		-- window outline
 		if window_border_color then
 			target_db:set_box(x-1,y-1,element.width+2, element.height+2, window_border_color[1], window_border_color[2], window_border_color[3], window_border_color[4])
 		end
-		
+
 		-- still draw the image
 		return true
 	end
-	
+
 	-- call this function with the time since it has been last called to call the :update function for each window
 	function windows_e:update(dt)
 		for i, window in ipairs(windows) do
@@ -267,7 +268,7 @@ function window_manager.new_window_group(config)
 		end
 		gui.resort_elements(elements_list)
 	end
-	
+
 	-- forward keyboard events to the window with focus
 	function windows_e:handle_key_event(key, event)
 		for i, window in ipairs(windows) do
@@ -277,9 +278,14 @@ function window_manager.new_window_group(config)
 			end
 		end
 	end
-	
+
+	-- add a window window to the window manager
+	function windows_e:add_window(element)
+		windows:make_window(element)
+	end
+
 	return windows_e
-	
+
 end
 
 
