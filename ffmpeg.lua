@@ -13,14 +13,14 @@ local function non_blocking_popen(cmd, read_buffer_size)
 		int fileno(void* stream);
 		int fcntl(int fd, int cmd, int arg);
 		int *__errno_location ();
-		ssize_t read(int fd, void* buf, size_t count);
+		int read(int fd, void* buf, size_t count);
 	]])
-	
+
 	-- you can compile a simple C programm to find these values(Or look in the headers)
 	local F_SETFL = 4
 	local O_NONBLOCK = 2048
 	local EAGAIN = 11
-	
+
 	-- this "array" holds the errno variable
 	local _errno = ffi.C.__errno_location()
 
@@ -30,15 +30,15 @@ local function non_blocking_popen(cmd, read_buffer_size)
 
 	-- get a FILE* for our command
 	local file = assert(ffi.C.popen(cmd, "r"))
-	
+
 	-- turn the FILE* to a fd(int) for fcntl
 	local fd = ffi.C.fileno(file)
-	
+
 	-- set non-blocking mode for read
 	assert(ffi.C.fcntl(fd, F_SETFL, O_NONBLOCK)==0, "fcntl failed")
 
 	-- close the process, prevent reading, allow garbage colletion
-	function file_close(self)
+	local function file_close(self)
 		ffi.C.pclose(file)
 		self.read_buffer = nil
 		read_buffer = nil
@@ -49,7 +49,7 @@ local function non_blocking_popen(cmd, read_buffer_size)
 	-- nil, "EAGAIN" if there is no data aviable, and
 	-- nil, "closed" if the process has ended
 	local read = ffi.C.read
-	function file_read(self, size)
+	local function file_read(self, size)
 		local _size = math.min(read_buffer_size, size)
 		while true do
 			local nbytes = read(fd,read_buffer,_size)
@@ -138,14 +138,14 @@ function ffmpeg.open_command(command, width, height, nonblocking)
 	function video:draw_frame_to_db(target_db, frame)
 		target_db:load_data_rgb(frame)
 	end
-	
+
 	-- stop the video
 	function video:close()
 		video.proc:close()
 		video.read_frame = nil
 		video.draw_frame_to_db = nil
 	end
-	
+
 	return video
 end
 
@@ -168,7 +168,7 @@ function ffmpeg.open_file(filename, width, height, time, audio, nonblocking)
 	local time_arg = time and ("-ss "..time) or ""
 	local audio_arg = audio and ("-f pulse -buffer_duration 0.1 \"out\"") or ""
 	local ffmpeg_cmd = ("ffmpeg -y %s -re -i %s -pix_fmt bgr24 -vf scale=%d:%d -f rawvideo - %s 2> /dev/null"):format(time_arg, filename, width, height, audio_arg)
-	
+
 	return ffmpeg.open_command(ffmpeg_cmd, width, height, nonblocking)
 end
 
