@@ -53,7 +53,11 @@ function Font.from_drawbuffer(db, char_w, char_h, alpha_color, scale)
 	
 	-- draws a single character from the font
 	function font:draw_character(target_db, char_id, x, y, color)
-		local source_x, source_y = unpack(assert(self.chars[char_id]))
+		local char = self.chars[char_id]
+		if not char then
+			return
+		end
+		local source_x, source_y = unpack(char)
 		if color then
 			for oy=0, self.char_h-1 do
 				for ox=0, self.char_w-1 do
