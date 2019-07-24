@@ -11,7 +11,7 @@ for setting/getting terminal parameters(e.g. foreground color)
 function term.set_cursor(x,y)
 	local x = math.floor(tonumber(x) or 0) + 1
 	local y = math.floor(tonumber(y) or 0) + 1
-	
+
 	return ("\027[%d;%dH"):format(y,x)
 end
 
@@ -70,15 +70,45 @@ function term.rgb_to_ansi_color_bg_24bpp(r, g, b)
 end
 
 
--- return a ANSI 24-level grey code, or black/white codes 
+-- draws a vertical percentage bar using unicode block characters. Len is the length in characters, pct the percentage(0-1)
+function term.draw_pct_bar(len, pct)
+	local blocks = {
+		string.char(0xE2,0x96,0x8F),
+		string.char(0xE2,0x96,0x8E),
+		string.char(0xE2,0x96,0x8D),
+		string.char(0xE2,0x96,0x8C),
+		string.char(0xE2,0x96,0x8B),
+		string.char(0xE2,0x96,0x8A),
+		string.char(0xE2,0x96,0x89),
+	}
+	local fill = string.char(0xE2, 0x96, 0x88)
+	local str = {}
+	local fill_end = math.floor(len*pct)
+	local empty_start = math.ceil(len*pct)
+	for i=1, len do
+		local i_pct = (i-1)/(len-1)
+		if i <= fill_end then
+			table.insert(str, fill)
+		elseif i > empty_start then
+			table.insert(str, " ")
+		else
+			local rem = math.floor(((pct-(fill_end/len))/(1/len))*7)+1
+			table.insert(str, blocks[rem])
+		end
+	end
+	return table.concat(str)
+end
+
+
+-- return a ANSI 24-level grey code, or black/white codes
 function term.rgb_to_grey_24(r, g, b)
 	local _r = math.floor((r/255)*5)
 	local _g = math.floor((g/255)*5)
 	local _b = math.floor((b/255)*5)
-	
+
 	local avg = (_r + _g + _b) / 3
 	local grey_deviation = math.abs(avg-_r) + math.abs(avg-_g) + math.abs(avg-_b)
-	
+
 	-- if the grey is pure enough, return a grey code
 	if grey_deviation < 1 then
 		local grey = math.floor(((_r+_g+_b)/15)*26)
@@ -101,15 +131,15 @@ function term.rgb_to_ansi_color_fg_216(r, g, b)
 	local _r = math.floor((r/255)*5)
 	local _g = math.floor((g/255)*5)
 	local _b = math.floor((b/255)*5)
-	
+
 	-- 216-color index
 	local color_code = 16 + 36*_r + 6*_g + _b
-	
+
 	-- checl if color is grey
 	if term.rgb_to_grey_24(r,g,b) then
 		color_code = term.rgb_to_grey_24(r,g,b)
 	end
-	
+
 	-- set foreground color ANSI escape sequence
 	return "\027[38;5;"..color_code.."m"
 end
@@ -120,15 +150,15 @@ function term.rgb_to_ansi_color_bg_216(r, g, b)
 	local _r = math.floor((r/255)*5)
 	local _g = math.floor((g/255)*5)
 	local _b = math.floor((b/255)*5)
-	
+
 	-- 216-color index
 	local color_code = 16 + 36*_r + 6*_g + _b
-	
+
 	-- checl if color is grey
 	if term.rgb_to_grey_24(r,g,b) then
 		color_code = term.rgb_to_grey_24(r,g,b)
 	end
-	
+
 	-- set foreground color ANSI escape sequence
 	return "\027[48;5;"..color_code.."m"
 end
@@ -137,7 +167,7 @@ end
 -- set the new background color to the 24-greyscale version of the r,g,b values[0-255]
 function term.rgb_to_ansi_grey_bg_24(r, g, b)
 	local color_code = term.rgb_to_grey_24(r,g,b)
-	
+
 	-- set foreground color ANSI escape sequence
 	return "\027[48;5;"..color_code.."m"
 end
