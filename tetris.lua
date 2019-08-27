@@ -37,7 +37,7 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 			{ 0,0,0,0 },
 		},
 	}
-	
+
 	local board_w = board_w or 10
 	local board_h = board_h or 16
 	local tile_w = tile_w or 4
@@ -130,7 +130,7 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 		self.down_time = 0
 		self.down_timeout = 2
 		self.board = {}
-		
+
 		-- the board needs to be prefilled, because this determines the valid indexes
 		for y=1, board_h do
 			self.board[y] = {}
@@ -138,7 +138,6 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 				self.board[y][x] = 0
 			end
 		end
-
 	end
 
 	-- Check if the current tile needs to be dropped
@@ -151,11 +150,6 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 		end
 	end
 
-	-- Called on game over
-	function tetris:gameover()
-
-	end
-
 	-- After a tile was dropped, get the next tile, and reset the position/rotation,
 	-- then check if the tile fits on the board, if not calls :gameover()
 	function tetris:next_tile()
@@ -164,7 +158,7 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 		self.cx = spawn_x
 		self.cy = 1
 		self.r = 0
-		if not self:check_tile_at(self.cx, self.cy) then
+		if (not self:check_tile_at(self.cx, self.cy)) and self.gameover then
 			self:gameover()
 		end
 	end
@@ -267,7 +261,7 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 				end
 			end
 		end
-		
+
 	end
 
 	return tetris
@@ -294,16 +288,16 @@ local function run()
 	local down_time = 0
 	local redraw = true
 	local last = time.realtime()
-	
+
 	local colors = {
-		{255,0,0,255},
-		{0,255,0,255},
-		{0,0,255,255},
-		{255,255,0,255},
-		{0,255,255,255},
-		{255,0,255,255}
+		{255,0,0, 255},
+		{0,255,0, 255},
+		{0,0,255, 255},
+		{255,255,0, 255},
+		{0,255,255, 255},
+		{255,0,255, 255}
 	}
-	
+
 	local function draw()
 		db:clear(0,0,0,0)
 		tetris:draw_board_to_db(db, s, 0, 0, colors)
@@ -316,7 +310,7 @@ local function run()
 		print("Score: "..tetris.score.."   ")
 		print("                          ")
 	end
-	
+
 	while true do
 		local dt = time.realtime() - last
 		last = time.realtime()
@@ -344,11 +338,11 @@ local function run()
 			time.sleep(0.05)
 		end
 	end
-	
 end
 
 
 
 return {
-	new_tetris = new_tetris
+	new_tetris = new_tetris,
+	run = run
 }
