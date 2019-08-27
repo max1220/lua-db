@@ -173,4 +173,16 @@ function ffmpeg.open_file(filename, width, height, time, audio, nonblocking)
 end
 
 
+function ffmpeg.write_gif(filename, width, height, framerate, frames)
+	local ffmpeg_cmd = "ffmpeg -f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d -i - -frames:v 100 %s"
+	ffmpeg_cmd = ffmpeg_cmd:format(width, height, framerate, filename)
+	local proc = assert(io.popen(ffmpeg_cmd, "w"))
+	for i=1, #frames do
+		proc:write(frames[i]:dump_data_rgb())
+	end
+	proc:close()
+	return true
+end
+
+
 return ffmpeg
