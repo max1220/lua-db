@@ -22,7 +22,7 @@ local function gol_step(state_db, new_db)
 		for x=0, state_db:width()-1 do
 			-- get neighbours
 			local sum = get_3x3(x,y)
-			
+
 			-- pixels[5] is the center pixel of the 3x3 area
 			if is_set(x,y) > 0 then
 				-- cell alive
@@ -46,7 +46,7 @@ local function gol_step(state_db, new_db)
 					new_db:set_pixel(x,y,0,0,0,0)
 				end
 			end
-			
+
 		end
 	end
 end
@@ -73,18 +73,18 @@ if arg then
 		w = (sw*2-2)
 		h = (sh*4-8)
 	end
-	
+
 	local cstate = ldb.new(w,h)
 	local nstate = ldb.new(w,h)
 	random_fill(cstate)
-	
+
 	local gen = 0
-	
+
 	while true do
 		-- run a game of life step
 		gol_step(cstate, nstate)
 		gen = gen + 1
-		
+
 		-- swap references to drawbuffers
 		local tmp = cstate
 		cstate = nstate
@@ -101,7 +101,7 @@ if arg then
 		io.write(table.concat(lines, ldb.term.reset_color() .. "\n"))
 		io.write( ldb.term.reset_color(), "\ngen: " .. gen .. "       ")
 	end
-	
+
 else
 
 	-- non-interactive, return table
@@ -109,6 +109,3 @@ else
 		step = gol_step
 	}
 end
-
-
-
