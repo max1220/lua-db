@@ -67,9 +67,9 @@ static int ldb_bytelen(lua_State *L) {
 	return 1;
 }
 
-static int ldb_dump_data(lua_State *L) {
-	// dump the pixel data from the drawbuffer as lua string.
-	// keep in mind that \000 in Lua strings is valid, and this function
+static int ldb_dump_data_rgba(lua_State *L) {
+	// dump the pixel data from the drawbuffer as lua string, in rgba format
+	// keep in mind that 0x00 in Lua strings is valid, and this function
 	// will return such strings if a pixel color value is 0.
 	// Pixel format if r,g,b,a(left-to-right, top-to-bottom), see lua-db.h
 	drawbuffer_t *db;
@@ -80,16 +80,41 @@ static int ldb_dump_data(lua_State *L) {
 	return 1;
 }
 
+static int ldb_dump_data_rgb(lua_State *L) {
+	// dump the pixel data from the drawbuffer as lua string, in rgb format
+	// keep in mind that 0x00 in Lua strings is valid, and this function
+	// will return such strings if a pixel color value is 0.
+	// Pixel format if r,g,b,a(left-to-right, top-to-bottom), see lua-db.h
+	drawbuffer_t *db;
+	CHECK_DB(L, 1, db)
+
+	size_t len = db->w*db->h*3;
+	char* str = malloc(len);
+	int j = 0;
+	for (int i=0; i<db->w*db->h; i++) {
+		str[j] = ((char*)db->data)[i*4];
+		str[j+1] = ((char*)db->data)[i*4+1];
+		str[j+2] = ((char*)db->data)[i*4+2];
+		j = j + 3;
+	}
+
+	lua_pushlstring(L, str, len);
+
+	free(str);
+
+	return 1;
+}
+
 static int ldb_load_data_rgba(lua_State *L) {
 	// Load a string containing data for this drawbuffer.
 	// Format is rgba, like dump_data. Must str must be w*h*4 characters long.
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
-	
+
 	size_t str_len = 0;
 	const char* str = lua_tolstring(L, 2, &str_len);
-	
-	if (str_len == db->len) {	
+
+	if (str_len == db->len) {
 		for (size_t i=0; i<(str_len/4); i++) {
 			db->data[i] = (pixel_t) { str[i*4], str[i*4+1], str[i*4+2], str[i*4+3] };
 		}
@@ -98,7 +123,7 @@ static int ldb_load_data_rgba(lua_State *L) {
 	}
 	lua_pushnil(L);
 	lua_pushstring(L, "Invalid length");
-	
+
 	return 2;
 }
 
@@ -107,11 +132,11 @@ static int ldb_load_data_bgra(lua_State *L) {
 	// Format is bgra. Must str must be w*h*4 characters long.
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
-	
+
 	size_t str_len = 0;
 	const char* str = lua_tolstring(L, 2, &str_len);
-	
-	if (str_len == db->len) {	
+
+	if (str_len == db->len) {
 		for (size_t i=0; i<(str_len/4); i++) {
 			db->data[i] = (pixel_t) { str[i*4+2], str[i*4+1], str[i*4+0], str[i*4+3] };
 		}
@@ -120,7 +145,7 @@ static int ldb_load_data_bgra(lua_State *L) {
 	}
 	lua_pushnil(L);
 	lua_pushstring(L, "Invalid length");
-	
+
 	return 2;
 }
 
@@ -131,8 +156,8 @@ static int ldb_load_data_rgb(lua_State *L) {
 	CHECK_DB(L, 1, db)
 	size_t str_len = 0;
 	const char* str = lua_tolstring(L, 2, &str_len);
-	
-	if (str_len == db->w * db->h * 3) {	
+
+	if (str_len == db->w * db->h * 3) {
 		for (size_t i=0; i<(str_len/3); i++) {
 			db->data[i] = (pixel_t) { str[i*3+2], str[i*3+1], str[i*3+0], 255 };
 		}
@@ -141,7 +166,7 @@ static int ldb_load_data_rgb(lua_State *L) {
 	}
 	lua_pushnil(L);
 	lua_pushstring(L, "Invalid length");
-	
+
 	return 2;
 }
 
@@ -151,11 +176,11 @@ static int ldb_load_data_rgba_nonzeroalpha(lua_State *L) {
 	// ignores pixels whos alpha value is 0
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
-	
+
 	size_t str_len = 0;
 	const char* str = lua_tolstring(L, 2, &str_len);
-	
-	if (str_len == db->len) {	
+
+	if (str_len == db->len) {
 		for (size_t i=0; i<(str_len/4); i++) {
 			if (str[i*4+3] != 0) {
 				db->data[i] = (pixel_t) { str[i*4], str[i*4+1], str[i*4+2], str[i*4+3] };
@@ -166,7 +191,7 @@ static int ldb_load_data_rgba_nonzeroalpha(lua_State *L) {
 	}
 	lua_pushnil(L);
 	lua_pushstring(L, "Invalid length");
-	
+
 	return 2;
 }
 
@@ -199,7 +224,7 @@ static int ldb_clear(lua_State *L) {
 		lua_pushstring(L, "invalid r,g,b,a value");
 		return 2;
 	}
-	
+
 	// fast path for clear in uniform color
 	if ((r==g)&&(g==b)&&(b==a)) {
 		memset(db->data, r, db->len);
@@ -280,7 +305,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 
 	int w = lua_tointeger(L, 7);
 	int h = lua_tointeger(L, 8);
-	
+
 	int scale = lua_tointeger(L, 9);
 	int ignorealpha = lua_toboolean(L, 10);
 
@@ -288,7 +313,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 	int cy;
 	int sx;
 	int sy;
-	
+
 	pixel_t p;
 
 	// todo: fastpath for same width and ignorealpha set(use memcpy) and scale==1
@@ -303,7 +328,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 				}
 			}
 		}
-		
+
 	} else {
 		// draw scaled
 		for (cy=0; cy < h; cy=cy+1) {
@@ -318,7 +343,7 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 				}
 			}
 		}
-		
+
 	}
 
 	lua_pushboolean(L, 1);
@@ -487,14 +512,14 @@ static int ldb_set_line(lua_State *L) {
 	return 1;
 }
 
-float capsuleSDF(float px, float py, float ax, float ay, float bx, float by, float r) {
+static inline float capsuleSDF(float px, float py, float ax, float ay, float bx, float by, float r) {
     float pax = px - ax, pay = py - ay, bax = bx - ax, bay = by - ay;
     float h = fmaxf(fminf((pax * bax + pay * bay) / (bax * bax + bay * bay), 1.0f), 0.0f);
     float dx = pax - bax * h, dy = pay - bay * h;
     return sqrtf(dx * dx + dy * dy) - r;
 }
 
-void alphablend(drawbuffer_t* db, int x, int y, float alpha, float r, float g, float b) {
+static inline void alphablend(drawbuffer_t* db, int x, int y, float alpha, float r, float g, float b) {
 	if (alpha>0) {
 		pixel_t sp = DB_GET_PX(db, x, y)
 		pixel_t p = {
@@ -531,14 +556,22 @@ static int ldb_set_pixel_alphablend(lua_State *L) {
 	return 1;
 }
 
-void lineSDFAABB(drawbuffer_t* db, float x0, float y0, float x1, float y1, float radius, float r, float g, float b) {
+static inline void lineSDFAABB(drawbuffer_t* db, float x0, float y0, float x1, float y1, float radius, float r, float g, float b, int w, int h) {
     int x_min = (int)floorf(fminf(x0, x1) - radius);
     int x_max = (int) ceilf(fmaxf(x0, x1) + radius);
     int y_min = (int)floorf(fminf(y0, y1) - radius);
     int y_max = (int) ceilf(fmaxf(y0, y1) + radius);
+
+	// TODO
+    if ( (x_min >= w) || (y_min >= h) || (x_max < 0) || (y_max < 0) ) {
+		return;
+	}
+
     for (int y = y_min; y <= y_max; y++) {
 		for (int x = x_min; x <= x_max; x++) {
-			alphablend(db, x, y, fmaxf(fminf(0.5f - capsuleSDF(x, y, x0, y0, x1, y1, radius), 1.0f), 0.0f), r,g,b);
+			if ((x>=0) && (x<w) && (y>=0) && (y<h)) {
+				alphablend(db, x, y, fmaxf(fminf(0.5f - capsuleSDF(x, y, x0, y0, x1, y1, radius), 1.0f), 0.0f), r,g,b);
+			}
 		}
 	}
 }
@@ -556,11 +589,11 @@ static int ldb_set_line_anti_aliased(lua_State *L) {
 	int ri = lua_tointeger(L, 6);
 	int gi = lua_tointeger(L, 7);
 	int bi = lua_tointeger(L, 8);
-	
+
 	float r = (float)ri/255.0f;
 	float g = (float)gi/255.0f;
 	float b = (float)bi/255.0f;
-	
+
 	float radius = lua_tonumber(L, 9);
 
 	if ( (r < 0) || (g < 0) || (b < 0) || (r > 255) || (g > 255) || (b > 255) ) {
@@ -569,13 +602,13 @@ static int ldb_set_line_anti_aliased(lua_State *L) {
 		return 2;
 	}
 
-	lineSDFAABB(db, x0,y0,x1,y1,radius,r,g,b);
+	lineSDFAABB(db, x0,y0,x1,y1,radius,r,g,b, db->w, db->h);
 
 	lua_pushboolean(L, 1);
 	return 1;
 }
 
-static void set_vline(drawbuffer_t* db, int y, float x1, float x2, pixel_t p) {
+static inline void set_vline(drawbuffer_t* db, int y, float x1, float x2, pixel_t p) {
 	for (int cx= (x1 < x2 ? x1 : x2); cx<=(x1 > x2 ? x1 : x2); cx++) {
 		DB_SET_PX(db, cx,y, p)
 	}
@@ -587,7 +620,7 @@ static void fill_triangle_top(drawbuffer_t* db, float x1, float y1, float x2, fl
 	float slope2 = (x3-x2)/(y3-y2);
 	float cx1 = x3;
 	float cx2 = x3;
-		
+
 	for (int cy=y3; cy>y1; cy--) {
 		set_vline(db, cy, cx1, cx2, p);
 		cx1 -= slope1;
@@ -601,10 +634,10 @@ static void fill_triangle_bottom(drawbuffer_t* db, float x1, float y1, float x2,
 	float slope2 = (x3-x1) / (y3-y1);
 	float cx1 = x1;
 	float cx2 = x1;
-		
+
 	for (int cy=y1; cy<=y2; cy++) {
 		set_vline(db, cy, cx1, cx2, p);
-		
+
 		cx1 += slope1;
 		cx2 += slope2;
 	}
@@ -613,7 +646,7 @@ static void fill_triangle_bottom(drawbuffer_t* db, float x1, float y1, float x2,
 static int ldb_fill_triangle(lua_State *L) {
 	drawbuffer_t *db;
 	CHECK_DB(L, 1, db)
-	
+
 	int x0 = lua_tointeger(L, 2);
 	int y0 = lua_tointeger(L, 3);
 	int x1 = lua_tointeger(L, 4);
@@ -648,13 +681,13 @@ static int ldb_fill_triangle(lua_State *L) {
 		tmp_x = x1; x1 = x2; x2 = tmp_x;
 		tmp_y = y1; y1 = y2; y2 = tmp_y;
 	}
-	
+
 	// check if triangle is visible
 	if (((y0 < 0) && (y2 < 0)) || ((y0 >= db->h) && (y2 >= db->h))) {
 		return 0;
 	}
-	
-	
+
+
 	if (y1==y2) {
 		fill_triangle_bottom(db, x0,y0, x1,y1, x2,y2, p);
 	} else if (y0==y1) {
@@ -664,7 +697,7 @@ static int ldb_fill_triangle(lua_State *L) {
 		fill_triangle_bottom(db, x0,y0, x1,y1, split,y1, p);
 		fill_triangle_top(db, x1,y1, split,y1, x2,y2, p);
 	}
-	
+
 	return 0;
 }
 
@@ -726,7 +759,9 @@ static int l_new(lua_State *L) {
 		LUA_T_PUSH_S_CF("draw_to_drawbuffer", ldb_draw_to_drawbuffer)
 		LUA_T_PUSH_S_CF("pixel_function", ldb_pixel_function)
 		LUA_T_PUSH_S_CF("close", ldb_close)
-		LUA_T_PUSH_S_CF("dump_data", ldb_dump_data)
+		LUA_T_PUSH_S_CF("dump_data", ldb_dump_data_rgba)
+		LUA_T_PUSH_S_CF("dump_data_rgba", ldb_dump_data_rgba)
+		LUA_T_PUSH_S_CF("dump_data_rgb", ldb_dump_data_rgb)
 		LUA_T_PUSH_S_CF("load_data", ldb_load_data_rgba)
 		LUA_T_PUSH_S_CF("load_data_rgba", ldb_load_data_rgba)
 		LUA_T_PUSH_S_CF("load_data_rgba_nonzeroalpha", ldb_load_data_rgba_nonzeroalpha)
