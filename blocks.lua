@@ -9,17 +9,25 @@ local Blocks = {}
 -- draw using a space character with colored background for each pixel returned by pixel_callback
 function Blocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
 	local lines = {}
+	local rgb_to_escape = term.rgb_to_ansi_color_bg_216
+	if bpp24 then
+		rgb_to_escape = term.rgb_to_ansi_color_bg_24bpp
+	end
 	for y=0, height-1 do
 		local cline = {}
 		for x=0, width-1 do
 			local r,g,b,_char = pixel_callback(x,y)
-			local char = "\027[0m "
-			if _char then
+			local char
+			if r and g and b then
+				if _char then
+					char = rgb_to_escape(r,g,b) .. _char
+				else
+					char = rgb_to_escape(r,g,b) .. " "
+				end
+			elseif _char then
 				char = _char
-			elseif r and g and b and bpp24 then
-				char = term.rgb_to_ansi_color_bg_24bpp(r,g,b) .. " "
-			elseif r and g and b then
-				char = term.rgb_to_ansi_color_bg_216(r,g,b) .. " "
+			else
+				error("Pixel_callback failed!")
 			end
 			cline[x+1] = char
 		end
@@ -31,22 +39,13 @@ end
 
 -- utillity function to draw from a drawbuffer(calls draw_pixel_callback)
 function Blocks.draw_db(db, bpp24)
-
-	-- only return r,g,b if a>0, so the for a=0 the default terminal background is used
+	-- draw pixels with no alpha color in the default terminal background color
 	local function pixel_callback(x, y)
 		local r,g,b,a = db:get_pixel(x,y)
-		if a > 0 then
-			local char = " "
-			if ((r+g+b)/3) > 192 then
-				char = "#"
-			elseif ((r+g+b)/3) > 96 then
-				char = "*"
-			end
-			if bpp24 then
-				return term.rgb_to_ansi_color_bg_24bpp(r,g,b) .. char
-			else
-				return term.rgb_to_ansi_color_bg_216(r,g,b) .. char
-			end
+		if a == 0 then
+			return nil,nil,nil,"\027[0m "
+		else
+			return r,g,b
 		end
 	end
 
@@ -54,7 +53,6 @@ function Blocks.draw_db(db, bpp24)
 	local width = db:width()
 	local height = db:height()
 	return Blocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
-
 end
 
 
