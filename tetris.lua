@@ -239,6 +239,11 @@ local function new_tetris(board_w, board_h, spawn_x, tiles, tile_w, tile_h)
 		end
 	end
 
+	function tetris:drop()
+		while tetris:down() do
+		end
+	end
+
 	-- draw the board to a drawbuffer
 	function tetris:draw_board_to_db(db, s, ox, oy, colors)
 		for y=0, board_h-1 do
