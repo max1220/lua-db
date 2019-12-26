@@ -8,11 +8,12 @@ local Braile = {}
 
 
 local unicode_to_utf8
-if utf8 then
-	-- lua 5.3 has built-in function for this
+local ok, utf8 = pcall(require, "utf8")
+if ok then
+	-- We have a module for UTF8 support, either Lua5.3 or external
 	unicode_to_utf8 = utf8.char
 else
-	-- convert a unicode codepoint to utf8 character sequence
+	-- No module, so convert a unicode codepoint to utf8 character sequence "manually"
 	unicode_to_utf8 = function(c)
 		-- from https://gist.github.com/pygy/7154512
 		assert((55296 > c or c > 57343) and c < 1114112, "Bad Unicode code point: "..c..".")
@@ -31,9 +32,7 @@ end
 
 -- convert the set bits to a utf8 character sequence
 function Braile.get_chars(bits)
-	
 	-- braile characters start at unicode 0x2800
-	-- return utf8.char(bits + 0x2800)
 	return unicode_to_utf8(bits + 0x2800)
 end
 
@@ -44,7 +43,7 @@ end
 function Braile.draw_pixel_callback(width, height, pixel_callback, color_callback)
 	local chars_x = math.ceil(width/2)
 	local chars_y = math.ceil(height/4)
-	
+
 	-- iterate over every character that should be generated
 	local lines = {}
 	for y=0, chars_y do
@@ -53,7 +52,7 @@ function Braile.draw_pixel_callback(width, height, pixel_callback, color_callbac
 			local rx = x*2
 			local ry = y*4
 			local char_num = 0
-			
+
 			-- left 3
 			char_num = char_num + pixel_callback(rx+0, ry+0)
 			char_num = char_num + pixel_callback(rx+0, ry+1)*2
@@ -63,20 +62,18 @@ function Braile.draw_pixel_callback(width, height, pixel_callback, color_callbac
 			char_num = char_num + pixel_callback(rx+1, ry+0)*8
 			char_num = char_num + pixel_callback(rx+1, ry+1)*16
 			char_num = char_num + pixel_callback(rx+1, ry+2)*32
-			
+
 			--bottom 2
 			char_num = char_num + pixel_callback(rx+0, ry+3)*64
 			char_num = char_num + pixel_callback(rx+1, ry+3)*128
-			
+
 			if color_callback then
 				local color_code = color_callback(rx, ry, char_num)
 				table.insert(cline, color_code)
 			end
-			
+
 			if char_num == 0 then
 				--empty char, use space
-				--table.insert(cline, Braile.get_chars(2^math.random(1,7)))
-				--table.insert(cline, Braile.get_chars(1))
 				table.insert(cline, " ")
 			else
 				-- generate a utf8 character sequence for the braile code
@@ -86,7 +83,7 @@ function Braile.draw_pixel_callback(width, height, pixel_callback, color_callbac
 		end
 		table.insert(lines, table.concat(cline))
 	end
-	return lines
+	return lines, chars_x, chars_y
 end
 
 
@@ -114,13 +111,13 @@ function Braile.draw_db(db, threshold, color, bpp24)
 		end
 		return 0
 	end
-	
+
 	-- get foreground/background color codes from the drawbuffer
 	local function color_callback(x, y, char_num)
 		local r,g,b = db:get_pixel(x,y)
 		local bg = "\027[0m"
 		local fg = ""
-		
+
 		-- todo: replace hardcoded parameters
 		if char_num ~= 0 then
 			if (r+g+b)/3 > 25 then
@@ -134,40 +131,41 @@ function Braile.draw_db(db, threshold, color, bpp24)
 		end
 		return bg .. fg
 	end
-	
+
 	local width = db:width()
 	local height = db:height()
-	
+
 	if color then
 		return Braile.draw_pixel_callback(width, height, pixel_callback, color_callback)
 	else
 		return Braile.draw_pixel_callback(width, height, pixel_callback)
 	end
-	
 end
 
 
 -- function optimized for precision(like in graphs).
 -- Only uses the foreground color.
 function Braile.draw_db_precise(db, threshold, bpp24)
-	local threshold = tonumber(threshold) or 50
-	
+	local threshold = tonumber(threshold) or 0
+
 	local color_code_fg = term.rgb_to_ansi_color_fg_216
 	if bpp24 then
 		color_code_fg = term.rgb_to_ansi_color_fg_24bpp
 	end
-	
+
+	-- determine if a pixel is represented by a braile dot
 	local function pixel_callback(x,y)
 		local r,g,b,a = db:get_pixel(x,y)
 		if a > 0 then
-			local avg = (r+g+b)/3
-			if avg > threshold then
-				return 1
+			if ((r+g+b)/3) < threshold then
+				return 0
 			end
+			return 1
 		end
 		return 0
 	end
-	
+
+	-- determine color of braile dot cluster, starting at x,y(2x4)
 	local function color_callback(x,y)
 		local avg_r = 0
 		local avg_g = 0
@@ -193,19 +191,18 @@ function Braile.draw_db_precise(db, threshold, bpp24)
 			return color_code_fg(0,0,0)
 		end
 	end
-	
+
 	local width = db:width()
 	local height = db:height()
-	
+
 	return Braile.draw_pixel_callback(width, height, pixel_callback, color_callback)
-	
 end
 
 
 
 -- draw from a table containing pixel(and color) information
 function Braile.draw_table(tbl, bpp24)
-	
+
 	-- get a boolean pixel value from the table for the braile chars
 	local function pixel_callback(x, y)
 		if tbl[y+1] and tbl[y+1][x+1] then
@@ -214,14 +211,14 @@ function Braile.draw_table(tbl, bpp24)
 		end
 		return 0
 	end
-	
+
 	local color_code_bg = term.rgb_to_ansi_color_bg_216
 	local color_code_fg = term.rgb_to_ansi_color_fg_216
 	if bpp24 then
 		color_code_bg = term.rgb_to_ansi_color_bg_24bpp
 		color_code_fg = term.rgb_to_ansi_color_fg_24bpp
 	end
-	
+
 	-- get foreground/background color codes from the drawbuffer
 	local function color_callback(x, y)
 		local px,r,g,b = unpack(tbl[y+1][x+1])
@@ -232,10 +229,10 @@ function Braile.draw_table(tbl, bpp24)
 		end
 		return ""
 	end
-	
+
 	local width = tbl.width or #tbl[1]
 	local height = tbl.height or #tbl
-	
+
 	return Braile.draw_pixel_callback(width, height, color_callback)
 end
 
