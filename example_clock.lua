@@ -11,13 +11,12 @@ db:clear(0,0,0,0)
 
 -- draw clock to drawbuffer
 local t = os.date("*t")
-clock.draw_clock(db, w,h, 0,0, t.hour, t.min, t.sec)
+clock.draw_clock(db, w,h, 0,0, t.hour, t.min, t.sec, true, 255,0,0)
 
 -- output
 local lines
 if blocks then
-	ldb.blocks.get_color_code_bg = ldb.term.rgb_to_ansi_color_bg_24bpp
-	lines = ldb.blocks.draw_db(db, 0, true)
+	lines = ldb.blocks.draw_db(db, true)
 else
 	lines = ldb.braile.draw_db_precise(db, 0, true)
 end
