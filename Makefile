@@ -1,5 +1,7 @@
 CFLAGS = -O3 -fPIC -std=c99 -Wall -Wextra -Wpedantic
 #CFLAGS = -O3 -fPIC -std=c99 -Wall -Wextra -Wpedantic -march=native -mtune=native
+#CFLAGS = -g -fPIC -std=c99 -Wall -Wextra -Wpedantic
+
 LIBS   = -shared -lm
 TARGET = lua_db.so
 
