@@ -7,11 +7,14 @@ local Blocks = {}
 
 
 -- draw using a space character with colored background for each pixel returned by pixel_callback
-function Blocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
+function Blocks.draw_pixel_callback(width, height, pixel_callback, bpp24, no_colors)
 	local lines = {}
 	local rgb_to_escape = term.rgb_to_ansi_color_bg_216
 	if bpp24 then
 		rgb_to_escape = term.rgb_to_ansi_color_bg_24bpp
+	end
+	if no_colors then
+		rgb_to_escape = function() return "" end
 	end
 	for y=0, height-1 do
 		local cline = {}

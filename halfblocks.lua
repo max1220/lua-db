@@ -7,15 +7,22 @@ local Halfblocks = {}
 
 
 -- draw using a space character with colored background for each pixel returned by pixel_callback
-function Halfblocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
+function Halfblocks.draw_pixel_callback(width, height, pixel_callback, bpp24, no_colors, threshold)
 	local lines = {}
+	local fb_utf8 = string.char(0xE2,0x96,0x88)
 	local hb_utf8 = string.char(0xE2,0x96,0x80)
+	local hb_lower_utf8 = string.char(0xE2,0x96,0x84)
+	local threshold = tonumber(threshold) or 1
 
 	local get_fg = term.rgb_to_ansi_color_fg_216
 	local get_bg = term.rgb_to_ansi_color_bg_216
 	if bpp24 then
 		get_fg = term.rgb_to_ansi_color_fg_24bpp
 		get_bg = term.rgb_to_ansi_color_bg_24bpp
+	end
+	if no_colors then
+		get_fg = function() return "" end
+		get_bg = function() return "" end
 	end
 
 	for y=0, (height/2)-1 do
@@ -31,6 +38,24 @@ function Halfblocks.draw_pixel_callback(width, height, pixel_callback, bpp24)
 			else
 				char = fg .. bg .. hb_utf8
 			end
+			if no_colors then
+				local up,down = false,false
+				if (r_0+g_0+b_0>threshold*3) then
+					up = true
+				end
+				if (r_1+g_1+b_1>threshold*3) then
+					down = true
+				end
+				if up and down then
+					char = fb_utf8
+				elseif up then
+					char = hb_utf8
+				elseif down then
+					char = hb_lower_utf8
+				else
+					char = " "
+				end
+			end
 			cline[x+1] = char
 		end
 		lines[y+1] = table.concat(cline)
@@ -45,7 +70,7 @@ function Halfblocks.draw_db(db, bpp24)
 	-- only return r,g,b if a>0, so the for a=0 the default terminal background is used
 	local function pixel_callback(x, y)
 		local r,g,b,a = db:get_pixel(x,y)
-		if a > 0 then
+		if (a > 0) then
 			return r,g,b
 		end
 	end
