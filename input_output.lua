@@ -1,9 +1,7 @@
+local ldb = require("lua-db.lua_db")
+
 local input_output = {}
 
-
-function input_output.new_from_arg(args)
-
-end
 
 function input_output.new_sdl(config)
 	local sdl2fb = require("sdl2fb")
@@ -13,11 +11,19 @@ function input_output.new_sdl(config)
 	-- check required config fields
 	local width = assert(tonumber(config.width))
 	local height = assert(tonumber(config.height))
+	local scale = tonumber(config.scale)
 	local title = config.title or "unnamed"
+
+	local scale_db
+	if scale and scale > 1 then
+		scale_db = ldb.new(width*scale, height*scale)
+	else
+		scale = 1
+	end
 
 	-- create the SDL window
 	function sdl_io:init()
-		self.sdlfb = sdl2fb.new(width, height, title)
+		self.sdlfb = sdl2fb.new(width*scale, height*scale, title)
 	end
 
 	-- close the SDL window
@@ -32,7 +38,12 @@ function input_output.new_sdl(config)
 
 	-- draw to the SDL2 window
 	function sdl_io:update_output(db)
-		self.sdlfb:draw_from_drawbuffer(db,0,0)
+		if scale > 1 then
+			db:draw_to_drawbuffer(scale_db, 0,0, 0,0, width, height, scale, true)
+			self.sdlfb:draw_from_drawbuffer(scale_db,0,0)
+		else
+			self.sdlfb:draw_from_drawbuffer(db,0,0)
+		end
 	end
 
 	-- handle input events
@@ -55,7 +66,6 @@ function input_output.new_sdl(config)
 	end
 
 	return sdl_io
-
 end
 
 function input_output.new_framebuffer(config)
@@ -102,7 +112,7 @@ function input_output.new_framebuffer(config)
 	end
 
 	-- mapping table from uinput event keys to sdl keys
-	local input_key_to_sdl_key = {
+	local input_key_to_sdl_key = config.key_to_sdl or {
 		[event_codes.KEY_Q] = "Q",
 		[event_codes.KEY_W] = "W",
 		[event_codes.KEY_E] = "E",
@@ -257,7 +267,9 @@ function input_output.new_terminal(config)
 	local ldb = require("lua-db")
 	local getch = require("lua-getch")
 
-	local term_io = {}
+	local term_io = {
+		event_queue = {}
+	}
 	local braile = config.braile
 	local halfblocks = config.halfblocks
 	local xskip = config.xskip or 1
@@ -266,6 +278,9 @@ function input_output.new_terminal(config)
 	local bg = config.bg
 	local darken = config.darken or 0.9
 	local threshold = config.threshold or 128
+	local block_chars = config.block_chars or {" ", ".", "-", "+", "O", "@", "#"}
+	local no_colors = config.no_colors
+	local blocks_use_chars = config.blocks_use_chars
 
 	local key_table = config.key_table or {
 		[10] = "enter",
@@ -306,7 +321,7 @@ function input_output.new_terminal(config)
 	local term_w, term_h
 	function term_io:init()
 		-- enable mouse codes
-		io.stdout:setvbuf("full")
+		--io.stdout:setvbuf("full")
 		io.write("\027[?1000;1006;1015h")
 		--os.execute("stty -echo")
 		term_w, term_h = ldb.term.get_screen_size()
@@ -333,6 +348,10 @@ function input_output.new_terminal(config)
 		local _floor = math.floor
 		local _fg_color = bpp24 and ldb.term.rgb_to_ansi_color_fg_24bpp or ldb.term.rgb_to_ansi_color_fg_216
 		local _bg_color = bpp24 and ldb.term.rgb_to_ansi_color_bg_24bpp or ldb.term.rgb_to_ansi_color_bg_216
+		if no_colors then
+			_fg_color = function() return "" end
+			_bg_color = _fg_color
+		end
 		if braile then
 			lines = ldb.braile.draw_pixel_callback(db:width()/xskip, db:height()/yskip, function(x,y)
 				local r,g,b,a = db:get_pixel(x*xskip, y*yskip)
@@ -340,14 +359,14 @@ function input_output.new_terminal(config)
 					return 1
 				end
 				return 0
-			end, function(x,y)
+			end, function(x,y, char_num)
 				local min_r, min_g, min_b = 255,255,255
 				local max_r, max_g, max_b = 0,0,0
 				local set = false
 				for oy=0, 3 do
 					for ox=0, 1 do
 						local r,g,b,a = db:get_pixel(x+ox,y+oy)
-						if a > 0 then
+						if (a > 0) then
 							set = true
 							max_r = math.max(max_r, r)
 							max_g = math.max(max_g, g)
@@ -363,49 +382,42 @@ function input_output.new_terminal(config)
 					return ""
 				end
 
-				if bpp24 and bg then
-					return ldb.term.rgb_to_ansi_color_fg_24bpp(max_r, max_g, max_b)..ldb.term.rgb_to_ansi_color_bg_24bpp(min_r*darken, min_g*darken, min_b*darken)
-				elseif bpp24 and (not bg) then
-					return ldb.term.rgb_to_ansi_color_fg_24bpp(max_r, max_g, max_b)
-				elseif (not bpp24) and bg then
-					return ldb.term.rgb_to_ansi_color_fg_216(max_r, max_g, max_b)..ldb.term.rgb_to_ansi_color_bg_216(min_r*darken, min_g*darken, min_b*darken)
-				elseif (not bpp24) and (not bg) then
-					return ldb.term.rgb_to_ansi_color_fg_216(max_r, max_g, max_b)
+				if bg then
+					return _fg_color(max_r, max_g, max_b) .. _bg_color(min_r*darken, min_g*darken, min_b*darken)
+				else
+					return _fg_color(max_r, max_g, max_b)
 				end
 			end)
 		elseif halfblocks then
 			local term_w, term_h = ldb.term.get_screen_size()
-			local chars = {" ", ".", "-", "+", "O", "@", "#"}
 			lines = ldb.halfblocks.draw_pixel_callback(term_w, term_h*2, function(x,y)
 				local r,g,b,a = db:get_pixel(x*xskip, y*yskip)
 				if (a > 0) and (r+g+b > 0) then
-					if bg then
-						local char_i = _floor(((r+g+b)/(255*3))*(#chars-1))+1
-						local char = _fg_color(r,g,b) .. _bg_color(r*0.3,g*0.3,b*0.3) .. chars[char_i]
-						return r,g,b,char
-					else
-						return r,g,b
-					end
+					return r,g,b
+				else
+					return 0,0,0
 				end
-			end, bpp24)
+			end, bpp24, no_colors, threshold)
 		else
 			local term_w, term_h = ldb.term.get_screen_size()
-			local chars = {" ", ".", "-", "+", "O", "@", "#"}
 			lines = ldb.blocks.draw_pixel_callback(term_w, term_h, function(x,y)
 				local r,g,b,a = db:get_pixel(x*xskip, y*yskip)
 				if (a > 0) and (r+g+b > 0) then
-					if bg then
-						local char_i = _floor(((r+g+b)/(255*3))*(#chars-1))+1
-						local char = _fg_color(r,g,b) .. _bg_color(r*0.3,g*0.3,b*0.3) .. chars[char_i]
+					if blocks_use_chars or no_colors then
+						local char_i = _floor(((r+g+b)/(255*3))*(#block_chars-1))+1
+						local char = _fg_color(r,g,b) .. _bg_color(r*0.3,g*0.3,b*0.3) .. block_chars[char_i]
 						return r,g,b,char
 					else
 						return r,g,b
 					end
+				else
+					return 0,0,0
 				end
-			end, bpp24)
+			end, bpp24, no_colors)
 		end
 		--io.write(ldb.term.clear_screen())
 		io.write(ldb.term.set_cursor(0,0))
+		io.flush()
 		io.write(table.concat(lines, ldb.term.reset_color().."\n"))
 		io.flush()
 	end
@@ -467,7 +479,8 @@ function input_output.new_terminal(config)
 		elseif key_resolved == "down" then
 			insert_key_events(events,  "Down")
 		elseif key_code and key_code ~= 0 then
-			--insert_key_events(events,  string.char(key_code):upper())
+			insert_key_events(events,  string.char(key_code):upper())
+			--print("key_code:", string.char(key_code):upper())
 		end
 		return events
 	end
@@ -478,6 +491,10 @@ function input_output.new_terminal(config)
 			self:handle_raw_term(key_code, key_resolved)
 		elseif self.handle_event then
 			for i, event in ipairs(term_key_to_sdl_events(key_code, key_resolved)) do
+				table.insert(self.event_queue, event)
+			end
+			local event = table.remove(self.event_queue, 1)
+			if event then
 				self:handle_event(event)
 			end
 		end
@@ -490,44 +507,180 @@ function input_output.new_terminal(config)
 	return term_io
 end
 
-function input_output.new_web()
-
-end
 
 
-function input_output.new_from_arg(_arg)
-	if arg:match("^sdl:(%d+):(%d+):(.+)$") then
-		local w,h,title = arg:match("^sdl:(%d+):(%d+):(.+)$")
-		return input_output.new_sdl({
-			title = title,
-			width = tonumber(w),
-			height = tonumber(h),
-		})
-	elseif arg:match("^fb:(%S+):(%S+):(%S+)$") then
-		local fbdev, kbdev, mousedev = arg:match("^fb:(%S+):(%S+):(%S+)$")
-		return input_output.new_framebuffer({
-			fbdev = fbdev,
-			kbdev = kbdev,
-			mousedev = mousedev
-		})
-	elseif arg:match("^term:(%S+):(%S+)$") then
-		local mode, bpp24 = arg:match("^term:(%S+):(%S+)$")
+function input_output.new_from_args(config, args)
+	--[[
+		--sdl
+			--width=number
+			--height=number
+			--title=text
+			--scale=number
+		--framebuffer
+			--key_table=filename
+			--fb=framebuffer device
+			--mouse=mouse device
+			--kb=keyboard device
+			--sensitivity=number(0-100)
+		--terminal
+			--key_table=filename
+			--braile
+				--braile_use_bg
+				--braile_bg_darken=number(0-100)
+			--blocks
+				--use_chars
+			--halfblocks
+			--no_colors
+			--bpp24
+			--threshold=number
+			--xskip=number
+			--yskip=number
+	]]
+	
+	local function get_arg_flag(arg_name)-- example: --foo
+		local flag_str = "--"..arg_name
+		for i,arg in ipairs(args) do
+			if arg==flag_str then
+				return true, i
+			end
+		end
+	end
+	local function get_arg_str(arg_name)-- example: --foo=test, foo="hello world"
+		local normal_pattern = "^--"..arg_name.."=\"(.*)\"$"
+		local quote_pattern = "^--"..arg_name.."=\"(.*)\"$"
+		for i,arg in ipairs(args) do
+			local str = arg:match(quote_pattern) or arg:match(normal_pattern)
+			if str then
+				return str, i
+			end
+		end
+	end
+	local function get_arg_num(arg_name)-- example: --foo=123, foo=0xCAFE
+		local num_pattern = "^--"..arg_name.."=(.*)$"
+		for i,arg in ipairs(args) do
+			local num_str = arg:match(num_pattern)
+			if num_str and (num_str:sub(1,2):lower()=="0x") and tonumber(num_str:sub(3), 16) then
+				return tonumber(num_str:sub(3), 16), i
+			elseif num_str and tonumber(num_str) then
+				return tonumber(num_str), i
+			end
+		end
+	end
+	local function terminate(reason)
+		io.stderr:write("\027[0m\027[31m", reason, "\027[0m\n")
+		os.exit()
+	end
+	
+	local mode = config.default_mode
+	if get_arg_flag("sdl") then
+		mode = "sdl"
+	elseif get_arg_flag("terminal") then
+		mode = "terminal"
+	elseif get_arg_flag("framebuffer") then
+		mode = "framebuffer"
+	end
+	
+	local terminal_mode
+	if get_arg_flag("braile") then
+		terminal_mode = "braile"
+		mode = "terminal"
+	elseif get_arg_flag("halfblocks") then
+		terminal_mode = "halfblocks"
+		mode = "terminal"
+	elseif get_arg_flag("blocks") then
+		terminal_mode = "blocks"
+		mode = "terminal"
+	end
+	if mode == "terminal" then
+		local key_table, bpp24
+		local braile_use_bg, braile_darken
+		terminal_mode = terminal_mode or config.terminal_mode or "braile"
+		local xskip = get_arg_num("xskip") or config.terminal_xskip
+		local yskip = get_arg_num("yskip") or config.terminal_yskip
+		local no_colors = get_arg_flag("no_colors")
+		local threshold = get_arg_num("threshold") or config.terminal_threshold or 0
+		local blocks_use_chars
+		
+		if terminal_mode == "braile" then
+			braile_use_bg = get_arg_flag("braile_use_bg") or config.terminal_braile_use_bg
+			if braile_use_bg then
+				if get_arg_num("braile_bg_darken") then
+					braile_darken = 1-(math.max(math.min(get_arg_num("braile_bg_darken"), 100), 0)/100)
+				end
+			end
+		end
+		if terminal_mode == "blocks" then
+			blocks_use_chars = get_arg_flag("use_chars")
+		end
+		
+		bpp24 = get_arg_flag("bpp24") or config.terminal_bpp24
+		
+		if get_arg_str("key_table") then
+			local ok,ret = pcall(require, get_arg_str("key_table"))
+			if ok then
+				key_table = ret
+			end
+		else
+			key_table = config.terminal_key_table
+		end
+		
 		return input_output.new_terminal({
-			braile = (mode=="braile"),
-			halfblocks = (mode=="halfblocks"),
-			xskip = 1,
-			yskip = 1,
-			bpp24 = (bpp24 == "y"),
-			threshold = 64,
-			bg = false
-		})
-	else
-		return input_output.new_sdl({
-			title = "Unnamed window",
-			width = 800,
-			height = 600,
+			braile = (terminal_mode == "braile"),
+			halfblocks = (terminal_mode == "halfblocks"),
+			bg = braile_use_bg,
+			darken = braile_darken,
+			bpp24 = bpp24,
+			xskip = xskip,
+			yskip = yskip,
+			no_colors = no_colors,
+			threshold = threshold,
+			blocks_use_chars = blocks_use_chars
 		})
 	end
+	
+	
+	if mode == "framebuffer" then
+		local key_to_sdl
+		
+		local fbdev = get_arg_str("fb") or config.framebuffer_dev or terminate("Must specify --fb= for framebuffer mode")
+		local mousedev = get_arg_str("mouse") or config.framebuffer_mouse_dev or terminate("Must specify --mouse= for framebuffer mode")
+		local kbdev = get_arg_str("kb") or config.framebuffer_mouse_dev or terminate("Must specify --kb= for framebuffer mode")
+		
+		local mouse_sensitivity = get_arg_num("sensitivity") or config.framebuffer_mouse_sensitivity
+		if get_arg_str("key_table") then
+			local ok,ret = pcall(require, get_arg_str("key_table"))
+			if ok then
+				key_to_sdl = ret
+			end
+		else
+			key_to_sdl = config.framebuffer_key_table
+		end
+		
+		return input_output.new_framebuffer({
+			fbdev = fbdev,
+			mousedev = mousedev,
+			kbdev = kbdev,
+			mouse_sensitivity = mouse_sensitivity
+		})
+	end
+	
+	if mode == "sdl" then
+		local width, height = get_arg_num("width") or config.sdl_width or terminate("Must specify --width= for SDL mode"), get_arg_num("height") or config.sdl_height or terminate("Must specify --height= for SDL mode")
+		local scale = get_arg_num("scale") or config.sdl_scale
+		local title = get_arg_str("title") or config.sdl_title
+		
+		
+		return input_output.new_sdl({
+			width = width,
+			height = height,
+			scale = scale,
+			title = title,
+		})
+	else
+		terminate("Must specify a mode! Try: --sdl")
+	end
+	
 end
+
 
 return input_output
