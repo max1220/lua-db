@@ -27,6 +27,20 @@
 #define LUA_T_PUSH_S_CF(S, CF) lua_pushstring(L, S); lua_pushcfunction(L, CF); lua_settable(L, -3);
 
 
+
+static inline void alphablend(drawbuffer_t* db, int x, int y, float alpha, float r, float g, float b) {
+	if (alpha>0) {
+		pixel_t sp = DB_GET_PX(db, x, y)
+		pixel_t p = {
+			.r=sp.r * (1 - alpha) + r * alpha * 255,
+			.g=sp.g * (1 - alpha) + g * alpha * 255,
+			.b=sp.b * (1 - alpha) + b * alpha * 255,
+			.a=255
+		};
+		DB_SET_PX(db, x,y,p)
+    }
+}
+
 static int ldb_tostring(lua_State *L) {
 	// return a string with info about the drawbuffer to Lua
 	drawbuffer_t *db;
@@ -309,6 +323,8 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 	int scale = lua_tointeger(L, 9);
 	int ignorealpha = lua_toboolean(L, 10);
 
+	int do_alphablend = lua_toboolean(L, 11);
+
 	int cx;
 	int cy;
 	int sx;
@@ -324,7 +340,11 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 			for (cx=0; cx < w; cx=cx+1) {
 				p = DB_GET_PX(origin_db, (cx+origin_x), (cy+origin_y))
 				if ((p.a > 0) || ignorealpha) {
-					DB_SET_PX(target_db, (cx+target_x), (cy+target_y), p)
+					if (do_alphablend) {
+						alphablend(target_db, (cx+target_x), (cy+target_y), (float)p.a/255.0f, (float)p.r/255.0f, (float)p.g/255.0f, (float)p.b/255.0f);
+					} else {
+						DB_SET_PX(target_db, (cx+target_x), (cy+target_y), p)
+					}
 				}
 			}
 		}
@@ -337,7 +357,11 @@ static int ldb_draw_to_drawbuffer(lua_State *L) {
 				if ((p.a > 0) || ignorealpha) {
 					for (sy=0; sy < scale; sy=sy+1) {
 						for (sx=0; sx < scale; sx=sx+1) {
-							DB_SET_PX(target_db, (cx*scale+sx+target_x), (cy*scale+sy+target_y), p)
+							if (do_alphablend) {
+								alphablend(target_db, (cx*scale+sx+target_x), (cy*scale+sy+target_y), p.a, p.r, p.g, p.b);
+							} else {
+								DB_SET_PX(target_db, (cx*scale+sx+target_x), (cy*scale+sy+target_y), p)
+							}
 						}
 					}
 				}
@@ -519,18 +543,7 @@ static inline float capsuleSDF(float px, float py, float ax, float ay, float bx,
     return sqrtf(dx * dx + dy * dy) - r;
 }
 
-static inline void alphablend(drawbuffer_t* db, int x, int y, float alpha, float r, float g, float b) {
-	if (alpha>0) {
-		pixel_t sp = DB_GET_PX(db, x, y)
-		pixel_t p = {
-			.r=sp.r * (1 - alpha) + r * alpha * 255,
-			.g=sp.g * (1 - alpha) + g * alpha * 255,
-			.b=sp.b * (1 - alpha) + b * alpha * 255,
-			.a=255
-		};
-		DB_SET_PX(db, x,y,p)
-    }
-}
+
 
 static int ldb_set_pixel_alphablend(lua_State *L) {
 	// set the pixel at x,y to r,g,b,a in the drawbuffer
