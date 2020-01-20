@@ -61,8 +61,8 @@ function input_output.new_sdl(config)
 		end
 	end
 
+	-- user callback to handle an event
 	function sdl_io:handle_event(ev)
-		-- user callback to handle an event
 	end
 
 	return sdl_io
@@ -253,11 +253,10 @@ function input_output.new_framebuffer(config)
 			end
 			mouse_ev = self.mouse:read()
 		end
-
 	end
 
+	-- user callback to handle an event
 	function fb_io:handle_event(ev)
-		-- user callback to handle an event
 	end
 
 	return fb_io
@@ -500,8 +499,9 @@ function input_output.new_terminal(config)
 		end
 	end
 
+	-- user callback to handle an event
 	function term_io:handle_event(ev)
-		-- user callback to handle an event
+		
 	end
 
 	return term_io
@@ -546,7 +546,7 @@ function input_output.new_from_args(config, args)
 		end
 	end
 	local function get_arg_str(arg_name)-- example: --foo=test, foo="hello world"
-		local normal_pattern = "^--"..arg_name.."=\"(.*)\"$"
+		local normal_pattern = "^--"..arg_name.."=(.*)$"
 		local quote_pattern = "^--"..arg_name.."=\"(.*)\"$"
 		for i,arg in ipairs(args) do
 			local str = arg:match(quote_pattern) or arg:match(normal_pattern)
@@ -642,9 +642,9 @@ function input_output.new_from_args(config, args)
 	if mode == "framebuffer" then
 		local key_to_sdl
 		
-		local fbdev = get_arg_str("fb") or config.framebuffer_dev or terminate("Must specify --fb= for framebuffer mode")
-		local mousedev = get_arg_str("mouse") or config.framebuffer_mouse_dev or terminate("Must specify --mouse= for framebuffer mode")
-		local kbdev = get_arg_str("kb") or config.framebuffer_mouse_dev or terminate("Must specify --kb= for framebuffer mode")
+		local fbdev = (get_arg_str("fb") or config.framebuffer_dev) or terminate("Must specify --fb= for framebuffer mode")
+		local mousedev = (get_arg_str("mouse") or config.framebuffer_mouse_dev) or terminate("Must specify --mouse= for framebuffer mode")
+		local kbdev = (get_arg_str("kb") or config.framebuffer_mouse_dev) or terminate("Must specify --kb= for framebuffer mode")
 		
 		local mouse_sensitivity = get_arg_num("sensitivity") or config.framebuffer_mouse_sensitivity
 		if get_arg_str("key_table") then
