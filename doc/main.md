@@ -80,16 +80,15 @@ You can install symlinks instead of running `make install`.
 
 ```
 # make sure target path exists
-sudo mkdir -p /usr/local/share/lua/5.1/lua-db
 sudo mkdir -p /usr/local/lib/lua/5.1/
 
 # install symlinks so make install is not needed after each change
 # (adjust paths of lua-db source path)
-sudo ln -s /home/max/stuff/lua-db3/lua /usr/local/share/lua/5.1/lua-db
-sudo ln -s /home/max/stuff/lua-db3/src/ldb_core.so /usr/local/lib/lua/5.1/
-sudo ln -s /home/max/stuff/lua-db3/src/ldb_fb.so /usr/local/lib/lua/5.1/
-sudo ln -s /home/max/stuff/lua-db3/src/ldb_gfx.so /usr/local/lib/lua/5.1/
-sudo ln -s /home/max/stuff/lua-db3/src/ldb_sdl.so /usr/local/lib/lua/5.1/
+sudo ln -s $(pwd)/lua /usr/local/share/lua/5.1/lua-db
+sudo ln -s $(pwd)/src/ldb_core.so /usr/local/lib/lua/5.1/
+sudo ln -s $(pwd)/src/ldb_fb.so /usr/local/lib/lua/5.1/
+sudo ln -s $(pwd)/src/ldb_gfx.so /usr/local/lib/lua/5.1/
+sudo ln -s $(pwd)/src/ldb_sdl.so /usr/local/lib/lua/5.1/
 ```
 
 
