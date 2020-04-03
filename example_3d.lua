@@ -1,7 +1,8 @@
 #!/usr/bin/env luajit
-local ldb = require("lua-db")
+local ldb = require("lua-db.lua-db")
 local time = require("time")
 local sdl2fb = require("sdl2fb")
+local braile = require("lua-db.braile")
 
 
 -- add the offset to each point
@@ -42,10 +43,10 @@ local function rotate_points_xz(points, angle, new_points)
 end
 
 
--- camera is always at origin(0,0,0)
+-- translate 3d points to 2d points. camera is always at origin(0,0,0). ar is the aspect ratio(w/h).
 local function project_3d_to_2d(points_3d, points_2d, ar, fill)
 	local points_2d = points_2d or {}
-
+	
 	local j = 1
 	for i=1, #points_3d do
 		local point = points_3d[i]
@@ -67,6 +68,7 @@ local function project_3d_to_2d(points_3d, points_2d, ar, fill)
 		end
 		
 	end
+	
 	points_2d[j] = nil
 	return points_2d, j-1
 end
@@ -83,28 +85,13 @@ local function draw_objects(db, objects)
 		local min_a = 20
 		local max_a = 255
 		local a = max(min(i, 1), 0)*(max_a-min_a)+min_a
-		if dist < 10 then
-			db:set_pixel_alphablend(sx,sy,r,g,b,a)
-			db:set_pixel_alphablend(sx-1,sy,r,g,b,a)
-			db:set_pixel_alphablend(sx+1,sy,r,g,b,a)
-			db:set_pixel_alphablend(sx,sy-1,r,g,b,a)
-			db:set_pixel_alphablend(sx,sy+1,r,g,b,a)
-		elseif dist < 20 then
-			db:set_pixel_alphablend(sx-1,sy,r,g,b,a)
-			db:set_pixel_alphablend(sx+1,sy,r,g,b,a)
-			db:set_pixel_alphablend(sx,sy-1,r,g,b,a)
-			db:set_pixel_alphablend(sx,sy+1,r,g,b,a)
-		elseif dist < 30 then
-			db:set_pixel_alphablend(sx,sy,r,g,b,a)
-			db:set_pixel_alphablend(sx+1,sy+1,r,g,b,a)
-		else
-			db:set_pixel_alphablend(sx,sy,r,g,b,a)
-		end
+		db:set_pixel_alphablend(sx,sy,r,g,b,a)
 	end
 
 	-- draw a single line
 	local function set_line(db, x1,y1,x2,y2,r,g,b,a,dist)
 		db:set_line(x1,y1,x2,y2,r,g,b,a)
+		--db:set_line_anti_aliased(x1,y1,x2,y2,r,g,b,0.4+10*(1-math.tanh(dist*dist)))
 	end
 
 	-- draws a triangle on the screen
@@ -114,8 +101,11 @@ local function draw_objects(db, objects)
 
 	local _w = db:width()
 	local _h = db:height()
+	local hw = _w/2
+	local hh = _h/2
 	local _floor = math.floor
 
+	local triangle_draw_count = 0
 	for i=1, #objects do
 		local object = objects[i]
 		if not object then break end
@@ -134,8 +124,6 @@ local function draw_objects(db, objects)
 				
 			end
 		elseif object.type == "triangles" then
-			local hw = _w/2
-			local hh = _h/2
 			local colors = object._colors or object.colors
 			local points_2d = object.points_2d
 			for i=1, #object.points_2d, 3 do
@@ -145,6 +133,8 @@ local function draw_objects(db, objects)
 				local point_c = points_2d[i+2]
 				if not (point_a and point_b and point_c) then break end
 				-- TODO: better clipping
+				
+				triangle_draw_count = triangle_draw_count + 1
 				
 				local x1,y1,dist1 = point_a[1], point_a[2], point_a[3]
 				local x2,y2,dist2 = point_b[1], point_b[2], point_b[3]
@@ -158,7 +148,8 @@ local function draw_objects(db, objects)
 				
 			end
 		elseif object.type == "lines" then
-			for i=1, #object.points_2d, 2 do
+			--for i=1, #object.points_2d, 2 do
+			for i=1, 0 do
 				local color = object.colors[(i-1)/2+1] or {255,0,255,255}
 				local point_a = object.points_2d[i]
 				local point_b = object.points_2d[i+1]
@@ -168,52 +159,20 @@ local function draw_objects(db, objects)
 				local x1,y1,dist1 = point_a[1], point_a[2], point_a[3]
 				local x2,y2,dist2 = point_b[1], point_b[2], point_b[3]
 
-				set_line(db, x1,y1, x2,y2)
-				
+				set_line(db, x1*hw+hw,y1*hh+hh, x2*hw+hw,y2*hh+hh, color[1],color[2],color[3], color[4], (dist1+dist2)/2)
 			end
 		else
 			print("unknown obj", object.type)
 		end
 		
 	end
+	
+	print("triangle_draw_count", triangle_draw_count)
 end
 
 
--- generate a cube object
-local function object_cube_points(x,y,z,w,h,d,r,g,b)
-	local x = assert(tonumber(x))
-	local y = assert(tonumber(y))
-	local z = assert(tonumber(z))
-	local w = assert(tonumber(w))
-	local h = assert(tonumber(h))
-	local d = assert(tonumber(d))
-	
-	local hw = w/2
-	local hh = h/2
-	local hd = d/2
-	
-	local cube_points = {
-		{ -hw, -hh, -hd },
-		{ -hw, -hh,  hd },
-		{ -hw,  hh, -hd },
-		{  hw, -hh, -hd },
-		{ -hw,  hh,  hd },
-		{  hw,  hh, -hd },
-		{  hw, -hh,  hd },
-		{  hw,  hh,  hd }
-	}
-	
-	local cube_obj = {
-		type = "points",
-		color = { r,g,b,255 },
-		position = { x,y,z },
-		dimensions = { w,h,d },
-		points = cube_points
-	}
-	
-	return cube_obj
-end
-local function object_cube_lines(x,y,z,w,h,d,r,g,b)
+-- generate a cube made of lines at the specified coordinates and size
+local function object_cube_lines(x,y,z,w,h,d,r,g,b,a)
 	local x = assert(tonumber(x))
 	local y = assert(tonumber(y))
 	local z = assert(tonumber(z))
@@ -253,16 +212,94 @@ local function object_cube_lines(x,y,z,w,h,d,r,g,b)
 		{  hw,  hh, -hd },
 		{  hw,  hh,  hd },
 	}
+	
+	local colors = {}
+	for i=1, #cube_points do
+		colors[i] = {r,g,b,a}
+	end
 	
 	local cube_obj = {
 		type = "lines",
-		color = { r,g,b,255 },
+		colors = colors,
 		position = { x,y,z },
 		dimensions = { w,h,d },
 		points = cube_points
 	}
 	
 	return cube_obj
+end
+
+
+-- generate a cube made of triangle faces at the specified coordinates and size with the specified colors
+local function object_cube_faces(x,y,z,w,h,d,colors)
+	local x = assert(tonumber(x))
+	local y = assert(tonumber(y))
+	local z = assert(tonumber(z))
+	local w = assert(tonumber(w))
+	local h = assert(tonumber(h))
+	local d = assert(tonumber(d))
+	assert((#colors == 6) or (#colors == 12))
+	
+	local hw = w/2
+	local hh = h/2
+	local hd = d/2
+	
+	local cube_points = {}
+	local function triangle(x1,y1,z1, x2,y2,z2, x3,y3,z3)
+		local _x1 = (x1==1) and hw or -hw
+		local _y1 = (y1==1) and hh or -hh
+		local _z1 = (z1==1) and hd or -hd
+		local _x2 = (x2==1) and hw or -hw
+		local _y2 = (y2==1) and hh or -hh
+		local _z2 = (z2==1) and hd or -hd
+		local _x3 = (x3==1) and hw or -hw
+		local _y3 = (y3==1) and hh or -hh
+		local _z3 = (z3==1) and hd or -hd
+		table.insert(cube_points, { _x1, _y1, _z1 })
+		table.insert(cube_points, { _x2, _y2, _z2 })
+		table.insert(cube_points, { _x3, _y3, _z3 })
+	end
+	
+	triangle(0,0,1, 0,0,0, 1,0,0)
+	triangle(0,0,1, 1,0,0, 1,0,1)
+	
+	triangle(1,1,0, 0,1,0, 0,1,1)
+	triangle(1,1,1, 1,1,0, 0,1,1)
+	
+	
+	triangle(1,0,0, 0,0,0, 0,1,0)
+	triangle(0,1,0, 1,1,0, 1,0,0)
+	
+	triangle(0,0,1, 1,0,1, 0,1,1)
+	triangle(1,1,1, 0,1,1, 1,0,1)
+	
+	
+	triangle(0,0,0, 0,0,1, 0,1,0)
+	triangle(0,0,1, 0,1,1, 0,1,0)
+	
+	triangle(1,0,1, 1,0,0, 1,1,0)
+	triangle(1,1,1, 1,0,1, 1,1,0)
+	
+	
+	if #colors == 6 then
+		local _colors = {}
+		for i, color in ipairs(colors) do
+			table.insert(_colors, color)
+			table.insert(_colors, color)
+		end
+		colors = _colors
+	end
+	
+	local cube_obj = {
+		type = "triangles",
+		colors = colors,
+		position = { x,y,z },
+		dimensions = { w,h,d },
+		points = cube_points
+	}
+	
+	return cube_obj
+	
 end
 
 
@@ -270,49 +307,56 @@ end
 local function object_coordinate_marker(len, step)
 	
 	local x_obj = {
-		type = "points",
-		color = {255,0,0,255},
+		type = "lines",
+		colors = {},
 		position = { 0,0,0 },
 		points = {}
 	}
 	local y_obj = {
-		type = "points",
-		color = {0,255,0,255},
+		type = "lines",
+		colors = {},
 		position = { 0,0,0 },
 		points = {}
 	}
 	local z_obj = {
-		type = "points",
-		color = {0,0,255,255},
+		type = "lines",
+		colors = {},
 		position = { 0,0,0 },
 		points = {}
 	}
 	local xn_obj = {
-		type = "points",
-		color = {128,0,0,255},
+		type = "lines",
+		colors = {},
 		position = { 0,0,0 },
 		points = {}
 	}
 	local yn_obj = {
-		type = "points",
-		color = {0,128,0,255},
+		type = "lines",
+		colors = {},
 		position = { 0,0,0 },
 		points = {}
 	}
 	local zn_obj = {
-		type = "points",
-		color = {0,0,128,255},
+		type = "lines",
+		colors = {},
 		position = { 0,0,0 },
 		points = {}
 	}
 	
-	for i=0, len, step do
+	for i=1, len, step do
 		table.insert(x_obj.points, { i, 0, 0 })
 		table.insert(y_obj.points, { 0, i, 0 })
 		table.insert(z_obj.points, { 0, 0, i })
 		table.insert(xn_obj.points, { -i, 0, 0 })
 		table.insert(yn_obj.points, {  0,-i, 0 })
 		table.insert(zn_obj.points, {  0, 0,-i })
+		
+		table.insert(x_obj.colors, { 255, 0, 0, 255 })
+		table.insert(y_obj.colors, { 0, 255, 0, 255 })
+		table.insert(z_obj.colors, { 0, 0, 255, 255 })
+		table.insert(xn_obj.colors, {64, 0, 0, 255 })
+		table.insert(yn_obj.colors, {  0,64, 0, 255 })
+		table.insert(zn_obj.colors, {  0, 0,64, 255 })
 	end
 	
 	return x_obj, y_obj, z_obj, xn_obj, yn_obj, zn_obj
@@ -348,14 +392,24 @@ end
 
 
 -- load the wavefront .obj file into an object at the specified coordinates
-local function object_from_obj(filename, x, y, z, r,g,b,a)
+local function object_from_obj(filename, x, y, z)
 	
 	local vertices = {}
 	local points = {}
 
+	local x_max, y_max, z_max = 0,0,0
+	local x_min, y_min, z_min = math.huge,math.huge,math.huge
+
+
 	for line in io.lines(filename) do
 		local x,y,z = line:match("^v%s+(.+)%s+(.+)%s+(.+)$")
 		if x and y and z then
+			x_max = math.max(x_max, x)
+			y_max = math.max(y_max, y)
+			z_max = math.max(z_max, z)
+			x_min = math.min(x_min, x)
+			y_min = math.min(y_min, y)
+			z_min = math.min(z_min, z)
 			table.insert(vertices, {tonumber(x),tonumber(y),tonumber(z)})
 		end
 		
@@ -377,11 +431,26 @@ local function object_from_obj(filename, x, y, z, r,g,b,a)
 		table.insert(colors, {b,b,b, 255})
 	end
 	
+	print("x_min, x_max", x_min, x_max)
+	print("y_min, y_max", y_min, y_max)
+	print("z_min, z_max", z_min, z_max)
+	
+	local w = x_max - x_min
+	local h = y_max - y_min
+	local d = z_max - z_min
+	
+	translate_points(points, 0, -h/2, 0, points)
+	
+	for i=1, #points do
+		local p = points[i]
+	end
+	
 	local object = {
 		type = "triangles",
 		colors = colors,
 		points = points,
-		position = { x,y,z }
+		position = { x,y,z },
+		dimensions = { w,h,d }
 	}
 	
 	return object
@@ -392,8 +461,16 @@ end
 -- take a heightmap, and generates a triangles object for that heightmap.
 local function object_ground_from_heightmap(heights, x,y,z, step, height, r,g,b,a)
 
+	local max_h = 0
+	local min_h = math.huge
+	local hw = #heights[1]*step*0.5
+	local hh = #heights*step*0.5
+
 	local function get_height(x,y)
-		return (heights[y] or {})[x]
+		local height = (heights[y] or {})[x]
+		max_h = math.max(max_h, height)
+		min_h = math.min(min_h, height)
+		return height
 	end
 
 	local function get_heights(x,y)
@@ -407,7 +484,7 @@ local function object_ground_from_heightmap(heights, x,y,z, step, height, r,g,b,
 
 	local points = {}
 	local colors = {}
-
+	
 	for y=1, #heights-1 do
 		for x=1, #heights[y]-1 do
 			local px1 = (x-1)*step
@@ -415,27 +492,209 @@ local function object_ground_from_heightmap(heights, x,y,z, step, height, r,g,b,
 			local px2 = x*step
 			local pz2 = y*step
 			local heights = get_heights(x,y)
-			table.insert(points, { px2, heights[2], pz1 })
-			table.insert(points, { px1, heights[1], pz1 })
-			table.insert(points, { px1, heights[3], pz2 })
-			local b = math.random(128,192)
+			table.insert(points, { px2-hw, heights[2], pz1-hh })
+			table.insert(points, { px1-hw, heights[1], pz1-hh })
+			table.insert(points, { px1-hw, heights[3], pz2-hh })
+			local b = math.random(32,64)
 			table.insert(colors, {b,b,b,255})
-			table.insert(points, { px2, heights[2], pz1 })
-			table.insert(points, { px1, heights[3], pz2 })
-			table.insert(points, { px2, heights[4], pz2 })
-			b = math.random(192,255)
+			table.insert(points, { px2-hw, heights[2], pz1-hh })
+			table.insert(points, { px1-hw, heights[3], pz2-hh })
+			table.insert(points, { px2-hw, heights[4], pz2-hh })
+			b = math.random(64,128)
 			table.insert(colors, {b,b,b,255})
 		end
 	end
 	
+	local d = (math.abs(min_h) + math.abs(max_h)) * height
 	local object = {
 		type = "triangles",
 		position = {x,y,z},
+		dimensions = {hw*2,d,hh*2},
 		points = points,
 		colors = colors
 	}
 	
 	return object
+end
+
+
+-- create a bunch of cubes from a heightmap
+local function cubes_from_heightmap(heights, x,y,z, s, height)
+	local cubes = {}
+
+	local max_h = 0
+	for x=1, #heights-1 do
+		for z=1, #heights[x]-1 do
+			local height = math.floor(heights[x][z] * height)
+			max_h = math.max(max_h, height)
+			for y=1, height do
+				local b = math.random(32,255)
+				local colors = {
+					{b,b,b,255},
+					{b,b,b,255},
+					{b,b,b,255},
+					{b,b,b,255},
+					{b,b,b,255},
+					{b,b,b,255}
+				}
+				local cube = object_cube_faces(x*s,y*s,z*s, s,s,s, colors)
+				table.insert(cubes, cube)
+			end
+		end
+	end
+	
+	local points = {}
+	local colors = {}
+	for i=1, #cubes do
+		for j=1, #cubes[i].points do
+			local point = cubes[i].points[j]
+			local position = cubes[i].position
+			point[1] = point[1] + position[1]
+			point[2] = point[2] + position[2]
+			point[3] = point[3] + position[3]
+			table.insert(points, point)
+		end
+		for j=1, #cubes[i].colors do
+			table.insert(colors, cubes[i].colors[j])
+		end
+	end
+	
+	local w = (#heights-1)*s
+	local h = max_h
+	local d = (#heights[1]-1)*s
+	
+	translate_points(points, -(w/2)-(s/2), -s, -(d/2)-(s/2), points)
+	
+	local cube = {
+		type = "triangles",
+		position = {x,y,z},
+		dimensions = {w,h,d},
+		colors = colors,
+		points = points
+	}
+	
+	return cubes, cube
+end
+
+
+local function cubes_from_function(callback, x,y,z, w,h,d, s)
+	
+	local t = {}
+	local function callback_cache(cx,cy,cz)
+		if (cx>0) and (cy>0) and (cz>0) and (cx<=w) and (cy<=h) and (cz<=d) then
+			local index = cx..":"..cy..":"..cz
+			if t[index] then
+				return t[index]
+			else
+				local set = callback(cx,cy,cz)
+				t[index] = set
+				return set
+			end
+		else
+			return false
+		end
+	end
+	
+	local hw = w/2
+	local hh = h/2
+	local hd = d/2
+	local points = {}
+	local colors = {}
+	local function triangle(x1,y1,z1, x2,y2,z2, x3,y3,z3, ox,oy,oz, b)
+		--[[
+		local _x1 = (x1==1) and hw or -hw
+		local _y1 = (y1==1) and hh or -hh
+		local _z1 = (z1==1) and hd or -hd
+		local _x2 = (x2==1) and hw or -hw
+		local _y2 = (y2==1) and hh or -hh
+		local _z2 = (z2==1) and hd or -hd
+		local _x3 = (x3==1) and hw or -hw
+		local _y3 = (y3==1) and hh or -hh
+		local _z3 = (z3==1) and hd or -hd
+		]]
+		local _x1 = (x1==1) and s or -s
+		local _y1 = (y1==1) and s or -s
+		local _z1 = (z1==1) and s or -s
+		local _x2 = (x2==1) and s or -s
+		local _y2 = (y2==1) and s or -s
+		local _z2 = (z2==1) and s or -s
+		local _x3 = (x3==1) and s or -s
+		local _y3 = (y3==1) and s or -s
+		local _z3 = (z3==1) and s or -s
+		table.insert(points, { _x1+ox, _y1+oy, _z1+oz })
+		table.insert(points, { _x2+ox, _y2+oy, _z2+oz })
+		table.insert(points, { _x3+ox, _y3+oy, _z3+oz })
+		table.insert(colors, {b,b,b,255})
+	end
+	
+	local function cube(left, right, top, bottom, front, back, sx,sy,sz)
+		local b = math.random(32, 192)
+		if left then
+			triangle(0,0,0, 0,0,1, 0,1,0, sx+s*2,sy,sz, b)
+			triangle(0,0,1, 0,1,1, 0,1,0, sx+s*2,sy,sz, b)
+		end
+		if right then
+			triangle(1,0,1, 1,0,0, 1,1,0, sx,sy,sz, b)
+			triangle(1,1,1, 1,0,1, 1,1,0, sx,sy,sz, b)
+		end
+		if top then
+			triangle(1,1,0, 0,1,0, 0,1,1, sx,sy+s*2,sz, b)
+			triangle(1,1,1, 1,1,0, 0,1,1, sx,sy+s*2,sz, b)
+		end
+		if bottom then
+			triangle(0,0,1, 0,0,0, 1,0,0, sx,sy,sz, b)
+			triangle(0,0,1, 1,0,0, 1,0,1, sx,sy,sz, b)
+		end
+		if front then
+			triangle(1,0,0, 0,0,0, 0,1,0, sx,sy,sz+s*2, b)
+			triangle(0,1,0, 1,1,0, 1,0,0, sx,sy,sz+s*2, b)
+		end
+		if back then
+			triangle(0,0,1, 1,0,1, 0,1,1, sx,sy,sz, b)
+			triangle(1,1,1, 0,1,1, 1,0,1, sx,sy,sz, b)
+		end
+	end
+	
+	
+
+	for cz=0, d do
+		for cy=0, h do
+			for cx=0, w do
+				-- add x axis faces
+				local sx = cx*s*2
+				local sy = cy*s*2
+				local sz = cz*s*2
+				
+				
+				local a = callback_cache(cx,cy,cz)
+				local b = callback_cache(cx+1,cy,cz)
+				local left = (not a) and b
+				local right = a and (not b)
+								
+				-- add y axis faces
+				a = callback_cache(cx,cy,cz)
+				b = callback_cache(cx,cy+1,cz)
+				local top = (not a) and b
+				local bottom = a and (not b)
+				
+				-- add z axis faces
+				a = callback_cache(cx,cy,cz)
+				b = callback_cache(cx,cy,cz+1)
+				local front = (not a) and b
+				local back = a and (not b)
+				
+				cube(left, right, top, bottom, front, back, sx,sy,sz)
+			end
+		end
+	end
+	
+	return {
+		type = "triangles",
+		points = points, 
+		colors = colors,
+		position = {x,y,z},
+		dimensions = {w*s,h*s,d*s}
+	}
 end
 
 
@@ -501,10 +760,14 @@ local function resort_triangles(points, colors, new_points, new_colors)
 		
 		local color = colors[(i-1)/3+1]
 		local z = math.min(point_a[3], point_b[3], point_c[3])
-		table.insert(tmp_points, {z, point_a, point_b, point_c, color})
+		table.insert(tmp_points, {z, point_a, point_b, point_c, color, i})
 	end
 	table.sort(tmp_points, function(a,b)
-		return a[1] < b[1]
+		if a[1] == b[1] then
+			return a[6] < b[6]
+		else
+			return a[1] < b[1]
+		end
 	end)
 	local j = 1
 	for i=1, #tmp_points do
@@ -518,6 +781,31 @@ local function resort_triangles(points, colors, new_points, new_colors)
 	-- new_colors[j] = nil
 	
 	return new_points, new_colors
+end
+
+
+-- depth-sort the objects list by the AABB boundaries
+local function resort_objects(objects, camera)
+	table.sort(objects, function(a,b)
+	
+		-- the points we test
+		local points = {
+			a.position,
+			b.position
+		}
+		
+		-- translate global coordinates to camera relative coordinates
+		translate_points(points, camera.x, camera.y, camera.z, points)
+		rotate_points_xz(points, camera.r_xz, points)
+		
+		-- sort by z value of translated points (draw from back to front)
+		-- but also draw from bottom to top, if the z value is to close
+		if points[1][3] == points[2][3] then
+			return points[1][2] < points[2][2]
+		else
+			return points[1][3] < points[2][3]
+		end
+	end)
 end
 
 
@@ -549,11 +837,13 @@ local function objects_to_screen(objects, cx,cy,cz,r, ar)
 			end
 		end
 		
-		-- translate global coordinates to camera coordinates
-		translate_points(points_cache, cx, cy, cz, points_cache)
-		
-		-- rotate points around origin by camera rotation
-		rotate_points_xz(points_cache, r, points_cache)
+		if not object.disable_camera_translation then
+			-- translate global coordinates to camera coordinates
+			translate_points(points_cache, cx, cy, cz, points_cache)
+			
+			-- rotate points around origin by camera rotation
+			rotate_points_xz(points_cache, r, points_cache)
+		end
 		
 		-- project 3d points to 2d screen points with color information
 		if object.type == "points" then
@@ -568,6 +858,8 @@ local function objects_to_screen(objects, cx,cy,cz,r, ar)
 			
 			-- triangles require the length of points to remain the same after clipping
 			project_3d_to_2d(points_cache, points_2d, ar, true)
+		elseif object.type == "lines" then
+			project_3d_to_2d(points_cache, points_2d, ar)
 		end
 		
 		object.points_cache = points_cache
@@ -635,10 +927,27 @@ local function output_db(db)
 		db_scaled:clear(0,0,0,0)
 		db:draw_to_drawbuffer(db_scaled, 0,0,0,0,w,h,scale, false)
 	end
+	
 	sdlfb:draw_from_drawbuffer(db_scaled or db,0,0)
 end
 
 
+local function add_AABB_boxes(objects)
+	local boxes = {}
+	for i=1, #objects do
+		local obj = objects[i]
+		if not obj then break end
+		local pos = obj.position
+		local dim = obj.dimensions
+		if pos and dim then
+			print("Adding bounding box to:", obj.type, pos[1], pos[2], pos[3], "-", dim[1], dim[2], dim[3])
+			table.insert(boxes, object_cube_lines(pos[1], pos[2], pos[3], dim[1], dim[2], dim[3], 255,0,255,255))
+		end
+	end
+	for i=1, #boxes do
+		table.insert(objects, boxes[i])
+	end
+end
 
 
 
@@ -647,9 +956,23 @@ end
 -- source objects(this will contain the scene objects)
 local objects = {}
 
--- cube centered at 0,0,0 in pink
---table.insert(objects, object_cube_points(0,0,0,1,1,1,255,0,255))
 
+-- add a ground plane with random heights
+local perlin = require("perlin")
+local heights = {}
+for y=1, 20 do
+	local cline = {}
+	for x=1, 20 do
+		local v = perlin.noise2d(x,y,0.1, 8, math.random(1,1^24))^2
+		cline[x] = v
+	end
+	heights[y] = cline
+end
+local ground_obj = object_ground_from_heightmap(heights, 0, -10, 0, 5, 20)
+--table.insert(objects, ground_obj)
+--ground_obj.type = "lines"
+--ground_obj.color = {255,0,255,255}
+--ground_obj.rotation = 0
 
 
 -- coordinate points
@@ -660,40 +983,59 @@ table.insert(objects, c)
 table.insert(objects, d)
 table.insert(objects, e)
 table.insert(objects, f)
+table.insert(objects, {
+	type = "points",
+	color = {255,255,255,255},
+	position = { 0,0,0 },
+	points = { { 0,0,0 } }
+})
 
 
-
-table.insert(objects, object_cube_lines(0,0,0,1,1,1,255,0,255))
-
-
-
--- test triangle and plane
---table.insert(objects, object_triangle(0,0,0, {{0,0,0}, {1,0,0}, {0,0,1}}, {{255,0,255,255}}))
---table.insert(objects, object_plane_xz(0, 0, 0, 10, 10, 64,64,64,255))
+--[[
+table.insert(objects, object_cube_faces(0, 0, 0, 0.5,0.5,0.5, {
+	{0,64,0,255},
+	{0,255,0,255},
+	{0,0,64,255},
+	{0,0,255,255},
+	{64,0,0,255},
+	{255,0,0,255},
+}))
+]]
 
 
 -- load the teapot obj
-local teapot_obj = object_from_obj("../teapot.obj", -7, 0, -10)
+local teapot_obj = object_from_obj("../teapot.obj", 0, 0, 0)
 teapot_obj.rotation = 0
-table.insert(objects, teapot_obj)
+--table.insert(objects, teapot_obj)
 
 
--- add a ground plane with random heights
-local perlin = require("perlin")
-local heights = {}
-for y=1, 50 do
-	local cline = {}
-	for x=1, 50 do
-		local v = perlin.noise2d(x,y,0.05, 8, math.random(1,1^24))
-		cline[x] = v
+local teapots = {}
+for z=0, 2 do
+	for x=0, 2 do
+		local teapot = object_from_obj("../teapot.obj", x*5+5, 0, z*5+5)
+		teapot.rotation = math.random()*math.pi*2
+		table.insert(teapots, teapot)
+		--table.insert(objects, teapot)
 	end
-	heights[y] = cline
 end
-local ground_obj = object_ground_from_heightmap(heights, 0, 0, 0, 3, 10)
--- ground_obj.type = "points"
--- ground_obj.color = {255,0,255,255}
-ground_obj.rotation = 0
---table.insert(objects, ground_obj)
+
+
+local _, megacube = cubes_from_heightmap(heights, 0,0,0, 1, 3)
+--table.insert(objects, megacube)
+--for k,v in ipairs(cubes_from_heightmap(heights, 0,0,0, 0.1, 5, 255,0,255)) do
+	-- table.insert(objects, v)
+--end
+
+local cubes = cubes_from_function(function(x,y,z)
+	if (x%5 == 0) or (y%5 == 0) or (z%5 == 0)then
+		return true
+	end
+	return false
+end, 0,0,0, 10,10,10, 1)
+table.insert(objects, cubes)
+
+
+add_AABB_boxes(objects)
 
 
 -- move camera object
@@ -775,32 +1117,44 @@ local function update(dt)
 		down(camera, dt, speed)
 	end
 	if keys_down["Y"] then
-		left(camera, dt, speed)
+		left(camera, dt, 1)
 	elseif keys_down["X"] then
-		right(camera, dt, speed)
+		right(camera, dt, 1)
 	end
 	
 	-- rotate teapot
-	teapot_obj.rotation = teapot_obj.rotation + dt
+	--teapot_obj.rotation = teapot_obj.rotation + dt
+	-- teapot_obj.position[2] = math.sin(time.realtime())
+	
+	for i=1, #teapots do
+		local teapot = teapots[i]
+		teapot.rotation = teapot.rotation + dt
+	end
+	
 end
 
 
 local last = time.realtime()
+local target = 1/30 -- target fps
+local dts = {}
 while true do
 	local dt = time.realtime() - last
 	last = time.realtime()
 	
 	-- start with a clean canvas
-	db:clear(0,0,0,0)
-		
+	db:clear(0,0,0,255)
+
 	-- handle input events(mouse/keys)
 	handle_sdl_events()
 	
 	-- update the camera, teapot
 	update(dt)
 	
+	-- resort objects by z value
+	resort_objects(objects, camera)
+	
 	-- calculate 2d screen positions for each object
-	points_2d = objects_to_screen(objects, camera.x, camera.y, camera.z, camera.r_xz, w/h)
+	objects_to_screen(objects, camera.x, camera.y, camera.z, camera.r_xz, w/h)
 	
 	-- draw each object to the drawbuffer
 	draw_objects(db, objects)
@@ -808,7 +1162,27 @@ while true do
 	-- draw to sdl
 	output_db(db, true)
 	
-	-- io.write(("FPS: %8.2f    \r"):format(1/dt))
+	if #dts > 30 then
+		local min = math.huge
+		local max = 0
+		local avg = 0
+		for i=1, #dts do
+			avg = avg + dts[i]
+			min = math.min(min, dts[i])
+			max = math.max(max, dts[i])
+		end
+		avg = avg / #dts
+		print(("FPS statistics:  max: %6.2ffps(%.5fdt)   avg: %6.2ffps(%.5fdt)   min: %6.2ffps(%.5fdt)"):format(1/min, min, 1/avg,avg, 1/max,max))
+		dts = {}
+	else
+		table.insert(dts, dt)
+	end
+	
+	if dt < target then
+		local rem = (target - dt)*0.99
+		time.sleep(rem)
+	end
+	
 end
 
 
