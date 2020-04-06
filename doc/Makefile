@@ -3,10 +3,6 @@ src := $(sort $(wildcard *.md))
 anchors_src := $(src:.md=.anchor_md)
 all_src = $(src) $(anchors_src)
 sort_src = $(sort $(all_src))
-#ALL_DOCS := $(SOURCE_DOCS) $(ANCHORS)
-#DOCS := $(sort($(ALL_DOCS)))
-#DOCS := $(SOURCE_DOCS)
-
 
 
 .PHONY: all
