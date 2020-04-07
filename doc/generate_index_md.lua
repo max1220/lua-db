@@ -1,14 +1,11 @@
 #!/usr/bin/env lua5.1
--- start outputting the generated index
+-- This script generates a simple markdown index for each topic in the file argument list
 print("# Index\n")
 for _, file in ipairs(arg) do
-	local index = tonumber(file:match("^(%d%d%d%d)_"))
+	local index = tonumber(file:match("^(%d%d%d%d)_.*%.md$"))
 	local basename = file:match("^%d%d%d%d_(.*)%.md$")
 	local title = basename:gsub("_", " ")
-	--local link = basename .. ".md"
-	--local link = basename .. ".html"
 	local link = "#" .. basename
-
 	if (index % 100)==0 then
 		-- if the index number's last 2 digits are 0, this is a top-level
 		-- topic, and should not be indented.
@@ -19,7 +16,3 @@ for _, file in ipairs(arg) do
 		print("    - [" .. title.."](" .. link .. ")")
 	end
 end
-
--- TODO: generate links for html one document(links to #basename)
--- TODO: generate links for markdown one document(links to #basename?)
--- TODO: generate links for html multiple documents(links to basename.html)
