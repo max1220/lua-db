@@ -1,8 +1,8 @@
 MD=cmark
 src := $(sort $(wildcard *.md))
-anchors_src := $(src:.md=.anchor_md)
+anchors_src := $(src:.md=._md)
 all_src = $(src) $(anchors_src)
-sort_src = $(sort $(all_src))
+all_sort_src = $(sort $(all_src))
 
 
 .PHONY: all
@@ -17,28 +17,27 @@ help:
 	@echo " html (generate HTML documentation)"
 	@echo " clean (clean up markdown and HTML artifacts)"
 
-.PHONY: anchors
-anchors: $(src)
-	./generate_anchors.lua $^
 
 $(anchors_src):
+	./generate_anchor.lua $@ > $@
 
-merged._md: index._md $(sort_src)
+index._md: $(src)
+	./generate_index_md.lua $^ > $@
+
+merged._md: index._md $(all_sort_src)
 	cmark -t commonmark $^ > $@
 
 merged.html: merged._md
 	cmark -t html --unsafe $^ > $@
 
-index._md: $(src)
-	./generate_index_md.lua $^ > $@
 
 .PHONY: md
-md: anchors index._md merged._md
+md: merged._md
 
 .PHONY: html
-html: anchors md *.md merged.html
+html: merged.html
 
 
 .PHONY: clean
 clean:
-	rm -f merged.html index._md merged._md *.anchor_md
+	rm -f merged.html *._md
