@@ -1,4 +1,4 @@
-# Development Installation
+## Development Installation
 
 You can install symlinks instead of running `make install`.
 This makes testing changes easier, as there is no need for `make install`, which

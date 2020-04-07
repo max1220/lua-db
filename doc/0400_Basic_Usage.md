@@ -10,12 +10,17 @@ them in a table. (See `lua/init.lua`)
 
 To load just the C core, you can use `require("ldb_core")`.
 
-The returned table contains a function, `ldb.new_drawbuffer(width, height, px_fmt)`.
+The main structure in lua-db is a drawbuffer. It's a userdata value with
+associated metatable methods that represents a drawing surface.
+
+A drawbuffer is created using the new_drawbuffer function from the core module.
+```
+local db = ldb.new_drawbuffer(width, height, px_fmt)
+```
+
 `width` and `height` are in pixels and are required. `px_fmt` specifies the pixel format and is optional. By default, a 32bpp RGBA value is used.
 
 On success a drawbuffer usedata value is returned that has methods
 for interaction in it's metatable.
 
 On failure, nil and an error message is returned.
-
-For now, see `examples/` for further usage information. TODO.
