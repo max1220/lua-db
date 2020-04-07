@@ -1,6 +1,3 @@
-
-
-
 # Install/Uninstall configuration
 PREFIX = /usr/local
 LUA_DIR = $(PREFIX)
