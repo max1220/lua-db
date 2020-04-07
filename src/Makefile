@@ -1,9 +1,6 @@
-
-
-
 # Global configuration
-#CFLAGS = -g -fPIC -std=c99 -Wall -Wextra -Wpedantic
-CFLAGS = -O3 -fPIC -std=c99 -Wall -Wextra -Wpedantic -march=native -mtune=native
+CFLAGS = -g -fPIC -std=c99 -Wall -Wextra -Wpedantic
+#CFLAGS = -O3 -fPIC -std=c99 -Wall -Wextra -Wpedantic -march=native -mtune=native
 LIBFLAG = -shared -fpic -lm -Wl,--as-needed
 
 # Lua configuration
@@ -35,26 +32,27 @@ help:
 
 .PHONY: core
 core: ldb_core.so
-	#$(STRIP) $^
+	$(STRIP) $^
 	@echo "-> Building core module finished"
 
 .PHONY: module_gfx
 module_gfx: ldb_gfx.so
-	#$(STRIP) $^
+	$(STRIP) $^
 	@echo "-> Building extended graphics primitives module finished"
 
 .PHONY: module_sdl
 module_sdl: ldb_sdl.so
-	#$(STRIP) $^
+	$(STRIP) $^
 	@echo "-> Building SDL2 module finished"
 
 .PHONY: module_fb
 module_fb: ldb_fb.so
-	#$(STRIP) $^
+	$(STRIP) $^
 	@echo "-> Building Framebuffer module finished"
 
 .PHONY: clean
 clean:
+	@echo "-> Cleaning up build artifacts"
 	rm -f ldb_core.o ldb_gfx.o ldb_sdl.o
 	rm -f ldb_core.so ldb_gfx.so ldb_sdl.so ldb_fb.so
 
