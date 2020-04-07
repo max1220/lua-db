@@ -5,13 +5,12 @@
 3.  [Installation](#Installation)
       - [Documentation](#Documentation)
 4.  [Basic Usage](#Basic_Usage)
+      - [Examples](#Examples)
 5.  [Development](#Development)
       - [Directory structure](#Directory_structure)
       - [Installing symlinks](#Installing_symlinks)
 
 <a name="About"></a>
-
------
 
 # lua-db - lua drawbuffers
 
@@ -33,8 +32,6 @@ There are multiple output options:
 
 <a name="Dependencies"></a>
 
------
-
 # Dependencies
 
 See the respective readme's on how to install them.
@@ -45,8 +42,6 @@ See the respective readme's on how to install them.
   - cmark(building doc)
 
 <a name="Installation"></a>
-
------
 
 # Installation
 
@@ -60,9 +55,7 @@ This will build the library, then copy the Lua files to
 
 <a name="Documentation"></a>
 
------
-
-## Documentation
+## Building Documentation
 
 The Documentation is located in doc/ in markdown format.
 
@@ -73,9 +66,10 @@ This requires the `cmark` markdown converter to be installed and callable.
 
 The merged output files will be in `doc/merged._md` and `doc/merged.html`.
 
-<a name="Basic_Usage"></a>
+This repository might contain a `doc/merged._md` and `doc/merged.html` for
+convenience, but this might be out of date at times.
 
------
+<a name="Basic_Usage"></a>
 
 # Basic Usage
 
@@ -88,7 +82,13 @@ them in a table. (See `lua/init.lua`)
 
 To load just the C core, you can use `require("ldb_core")`.
 
-The returned table contains a function, `ldb.new_drawbuffer(width, height, px_fmt)`.
+The main structure in lua-db is a drawbuffer. It's a userdata value with
+associated metatable methods that represents a drawing surface.
+
+A drawbuffer is created using the new\_drawbuffer function from the core module.
+
+    local db = ldb.new_drawbuffer(width, height, px_fmt)
+
 `width` and `height` are in pixels and are required. `px_fmt` specifies the pixel format and is optional. By default, a 32bpp RGBA value is used.
 
 On success a drawbuffer usedata value is returned that has methods
@@ -96,11 +96,32 @@ for interaction in it's metatable.
 
 On failure, nil and an error message is returned.
 
-For now, see `examples/` for further usage information. TODO.
+<a name="Examples"></a>
+
+## Examples
+
+There are a bunch of examples in the `examples/` folder.
+They should be run from the main directory to find the assets, if any.
+
+They all share common output and input options
+(defined by `ldb.input_output.new_from_args`).
+
+e.g. if there is a X11 server running:
+
+    ./examples/clock.lua --sdl --width=320 --height=240
+
+on a unicode terminal:
+
+    ./examples/clock.lua --halfblocks
+
+The examples might leave your terminal emulator in a bad state, you might need
+to run `reset`.
+
+Here are a few screenshots of the running examples:
+
+TODO: Add screenshots
 
 <a name="Development"></a>
-
------
 
 # Development
 
@@ -112,8 +133,6 @@ If you implement a major new feature, make sure:
   - You provide at least basic documentation
 
 <a name="Directory_structure"></a>
-
------
 
 ## Directory structure
 
@@ -134,9 +153,7 @@ If you implement a major new feature, make sure:
 
 <a name="Installing_symlinks"></a>
 
------
-
-# Development Installation
+## Development Installation
 
 You can install symlinks instead of running `make install`.
 This makes testing changes easier, as there is no need for `make install`, which
