@@ -502,6 +502,39 @@ static inline void triangle(drawbuffer_t* db, int x0, int y0, int x1, int y1, in
 
 
 
+static inline float circleSDF(float px, float py, float cx, float cy, float r) {
+	float dx = px-cx;
+	float dy = py-cy;
+    return sqrtf(dx*dx + dy*dy) - r;
+}
+
+static inline void circle_fill_aliased(drawbuffer_t* db, float center_x, float center_y, float radius, uint8_t r, uint8_t g, uint8_t b, uint8_t a, int outline) {
+	float alpha, d;
+	uint32_t sp, p;
+	int cx, cy;
+	uint32_t tp = ((uint32_t)r<<24) | ((uint32_t)g<<16) | ((uint32_t)b<<8);
+
+	int x_min = (int)floorf(center_x-radius);
+	int x_max = (int) ceilf(center_x+radius);
+	int y_min = (int)floorf(center_y-radius);
+	int y_max = (int) ceilf(center_y+radius);
+
+    for (cy = y_min; cy <= y_max; cy++) {
+		for (cx = x_min; cx <= x_max; cx++) {
+			d = circleSDF(cx, cy, center_x, center_y, radius);
+			if (outline && (d<0)) {
+				d = -d;
+			}
+			alpha = fmaxf(fminf(0.5f - d, 1.0f), 0.0f)*(float)a;
+			if (alpha>0) {
+				sp = ldb_get_px(db, cx, cy);
+				p = alphablend(sp, tp | ((uint32_t)alpha));
+				ldb_set_px(db, cx, cy, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+			}
+		}
+	}
+}
+
 static inline void circle_fill(drawbuffer_t* db, int x, int y, int radius, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 	int r2 = radius * radius;
 	int area = r2 << 2;
@@ -900,16 +933,14 @@ static int lua_gfx_circle(lua_State *L) {
 
 	if (outline) {
 		if (alphablend) {
-			//rectangle_outline_alphablend(db, x,y, w,h, r,g,b,a);
+			circle_fill_aliased(db, x,y, radius, r,g,b,a, 1);
 		} else {
-			//rectangle_outline(db, x,y, w,h, r,g,b,a);
 			circle_outline(db, x,y, radius, r,g,b,a);
 		}
 	} else {
 		if (alphablend) {
-			//rectangle_fill_alphablend(db, x,y, w,h, r,g,b,a);
+			circle_fill_aliased(db, x,y, radius, r,g,b,a, 0);
 		} else {
-			//rectangle_fill(db, x,y, w,h, r,g,b,a);
 			circle_fill(db, x,y, radius, r,g,b,a);
 		}
 	}
