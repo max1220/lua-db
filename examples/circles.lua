@@ -1,25 +1,21 @@
 #!/usr/bin/env luajit
 local ldb = require("lua-db")
-local time = require("time")
 
+-- make sure we don't get the same random colors every time
+math.randomseed(os.time())
 
 -- create input and output handler for application
 local cio = ldb.input_output.new_from_args({
-	default_mode = "terminal",
-	default_terminal_mode = "halfblocks",
-	terminal_bpp24 = true
+	default_mode = "sdl",
+	sdl_width = 640,
+	sdl_height = 480,
+	limit_fps = 30
 }, arg)
 cio:init()
 
 
 -- create drawbuffer of native display size
 local w,h = cio:get_native_size()
-local output_db = ldb.new_drawbuffer(w,h)
-
-
--- make sure we don't get the same random colors every time
-math.randomseed(time.realtime())
-
 
 -- generate circles of increasing radius, with random colors
 local circles = {}
@@ -58,25 +54,25 @@ local function update_circles(dt)
 	end
 end
 
-
-local last = time.realtime()
-while not cio.stop do
-	local now = time.realtime()
-	local dt = now - last
-	last = now
-
-	output_db:clear(0,0,0,255)
-
+function cio:on_update(dt)
 	-- update circles radius
 	update_circles(dt)
+end
 
+function cio:on_draw(target_db)
 	-- draw circles to drawbuffer
+	target_db:clear(0,0,0,255)
 	for i=1, #circles do
 		local circle = circles[i]
-		output_db:circle(w/2, h/2, circle.radius, circle.color[1], circle.color[2], circle.color[3], 255)
+		target_db:circle(w/2, h/2, circle.radius, circle.color[1], circle.color[2], circle.color[3], 255)
 	end
+end
 
-	-- draw drawbuffer to output
-	cio:update_output(output_db)
-	cio:update_input()
+function cio:on_close()
+	self.run = false
+end
+
+cio.run = true
+while cio.run do
+	cio:update()
 end

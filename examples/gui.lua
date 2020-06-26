@@ -5,16 +5,18 @@ local time = require("time")
 
 -- create input and output handler for application
 local cio = ldb.input_output.new_from_args({
-	default_mode = "terminal",
-	default_terminal_mode = "halfblocks",
-	terminal_bpp24 = true
+	default_mode = "sdl",
+	sdl_title = "GUI test",
+	sdl_width = 800,
+	sdl_height = 600,
+	limit_fps = 30
 }, arg)
 cio:init()
 
 -- create drawbuffer of native display size
 local w,h = cio:get_native_size()
 local db = ldb.new_drawbuffer(w,h, ldb.pixel_formats.abgr8888)
-
+cio.target_db = db
 
 -- create the example fonts
 -- TODO: Better path handling for examples
@@ -322,7 +324,7 @@ ldb.gui.new_context_menu_element(vertical_group, menu, fonts.normal)
 
 
 -- handle an input_output event(Only forward mousebutton up/down)
-function cio:handle_event(ev)
+function cio:on_event(ev)
 	if ev.type == "mousebuttondown" then
 		root:propagate_event_down(ev, true)
 	elseif ev.type == "mousebuttonup" then
@@ -333,22 +335,23 @@ function cio:handle_event(ev)
 end
 
 
--- run until cio stops
-local last = time.realtime()
-while not cio.stop do
-	local now = time.realtime()
-	local dt = now - last
-	last = now
-
+function cio:on_update(dt)
 	text_element.text = ("FPS: %05.1f"):format(1/dt)
+end
 
+function cio:on_draw(target_db)
 	local r,g,b = unpack(bg_color)
 	db:clear(r,g,b, 255)
 
 	-- draw all descendants of the root element
 	root:handle_draw()
+end
 
-	-- draw drawbuffer to cio output, handle input events
-	cio:update_output(db)
-	cio:update_input()
+function cio:on_close()
+	self.run = false
+end
+
+cio.run = true
+while cio.run do
+	cio:update()
 end

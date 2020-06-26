@@ -5,25 +5,37 @@ local time = require("time")
 math.randomseed(time.realtime())
 
 local cio = ldb.input_output.new_from_args({
-	default_mode = "terminal",
+	default_mode = "sdl",
+	sdl_width = 640,
+	sdl_height = 480,
+	sdl_title = "Triangles example",
+	limit_fps = 60,
 }, arg)
 cio:init()
 local w,h = cio:get_native_size()
 local db = ldb.new_drawbuffer(w,h)
-
+cio.target_db = db
 
 local colors = {}
 local function random_colors()
 	colors = {}
-	for i=1, 5 do
+	for _=1, 5 do
 		table.insert(colors, {math.random(1,16)*16-1, math.random(1,16)*16-1, math.random(1,16)*16-1})
 	end
 end
 random_colors()
 
+local timeout = 0.2
+local remaining = 0
+
 local cx,cy = w/2,h/2
 local i = 0
-while true do
+function cio:on_update(dt)
+	remaining = remaining - dt
+	if remaining >= 0 then
+		return
+	end
+	remaining = timeout
 
 	local c = math.random(1, #colors)
 	db:triangle(0,0,w-1,0,cx,cy-i, colors[c][1], colors[c][2], colors[c][3],255)
@@ -47,11 +59,13 @@ while true do
 		db:clear(0,0,0,255)
 		random_colors()
 	end
+end
 
-	-- draw drawbuffer to output
-	cio:update_output(db)
-	cio:update_input()
+function cio:on_close()
+	self.run = false
+end
 
-	--sleep between draws
-	time.sleep(0.1)
+cio.run = true
+while cio.run do
+	cio:update()
 end

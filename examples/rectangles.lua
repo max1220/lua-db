@@ -5,18 +5,32 @@ local time = require("time")
 math.randomseed(time.realtime())
 
 local cio = ldb.input_output.new_from_args({
-	default_mode = "terminal",
+	default_mode = "sdl",
+	sdl_width = 640,
+	sdl_height = 480,
+	sdl_title = "Rectangles example",
+	limit_fps = 30
 }, arg)
 cio:init()
 local w,h = cio:get_native_size()
 local db = ldb.new_drawbuffer(w,h)
-
+cio.target_db = db
 
 local cw,ch = w,h
 local cx,cy = 0,0
 local dir_x = true
 local dir_y = true
-while not cio.stop do
+
+local timeout = 0.1
+local remaining = 0
+
+function cio:on_update(dt)
+	remaining = remaining - dt
+	if remaining >= 0 then
+		return
+	end
+	remaining = timeout
+
 	db:rectangle(cx,cy,cw,ch,math.random(1,16)*16-1,math.random(1,16)*16-1,math.random(1,16)*16-1,255)
 	local nx,ny = cx,cy
 	local nw,nh = cw,ch
@@ -49,10 +63,13 @@ while not cio.stop do
 		end
 	end
 
-	-- draw drawbuffer to output
-	cio:update_output(db)
-	cio:update_input()
+end
 
-	--sleep between draws
-	time.sleep(0.1)
+function cio:on_close()
+	self.run = false
+end
+
+cio.run = true
+while cio.run do
+	cio:update()
 end
