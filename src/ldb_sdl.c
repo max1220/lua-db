@@ -67,14 +67,24 @@ static int lua_sdl2fb_pool_event(lua_State *L) {
 		return 2;
 	}
 
+	int timeout = lua_tointeger(L, 2);
+
 	SDL_Event ev;
-	if (SDL_PollEvent(&ev) == 0) {
-		return 0;
+	if (timeout <= 0) {
+		// use pooling for events
+		if (SDL_PollEvent(&ev) == 0) {
+			return 0;
+		}
+	} else {
+		// wait for events
+		if (SDL_WaitEventTimeout(&ev, timeout) == 0) {
+			return 0;
+		}
 	}
 
-	lua_newtable(L);
 
-	//serialize event
+	//serialize SDL event to table
+	lua_newtable(L);
 	switch (ev.type) {
 		case SDL_KEYDOWN:
 			LUA_T_PUSH_S_S("type", "keydown")
