@@ -954,10 +954,10 @@ static int lua_gfx_set_px_alphablend(lua_State *L) {
 
 	int x = lua_tointeger(L, 2);
 	int y = lua_tointeger(L, 3);
-	int r = lua_tointeger(L, 6);
-	int g = lua_tointeger(L, 7);
-	int b = lua_tointeger(L, 8);
-	int a = lua_tointeger(L, 9);
+	int r = lua_tointeger(L, 4);
+	int g = lua_tointeger(L, 5);
+	int b = lua_tointeger(L, 6);
+	int a = lua_tointeger(L, 7);
 
 	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
 		lua_pushnil(L);
