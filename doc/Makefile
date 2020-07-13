@@ -1,43 +1,49 @@
 MD=cmark
-src := $(sort $(wildcard *.md))
-anchors_src := $(src:.md=._md)
-all_src = $(src) $(anchors_src)
-all_sort_src = $(sort $(all_src))
+DOCTREE=document_tree.lua
+MD_MERGED=merged.md
+HTML_INDEX=index.html
+HTML_MERGED=merged.html
+TMP_HTML_MERGE=merged.html.md
 
+$(MD_MERGED): $(DOCTREE)
+	./generate_doc.lua --merge $^ $@
 
-.PHONY: all
-all: md html
-	@echo "Building doc finished."
+$(HTML_MERGED): $(TMP_HTML_MERGE)
+	cmark -t html --unsafe $^ > $@
+
+$(TMP_HTML_MERGE): $(DOCTREE)
+	./generate_doc.lua --html_anchor $^ $@
+
+$(HTML_INDEX): $(DOCTREE)
+	./generate_doc.lua --html_menu $^ $@
+
 
 .PHONY: help
 help:
 	@echo "Supported make targets:"
 	@echo " help (this message)"
-	@echo " md (generate markdown documentation)"
+	@echo " all (generate documentation in all formats)"
+	@echo " index (generate documentation index)"
+	@echo " md (generate merged markdown documentation)"
 	@echo " html (generate HTML documentation)"
 	@echo " clean (clean up markdown and HTML artifacts)"
 
 
-$(anchors_src):
-	./generate_anchor.lua $@ > $@
-
-index._md: $(src)
-	./generate_index_md.lua $^ > $@
-
-merged._md: index._md $(all_sort_src)
-	cmark -t commonmark $^ > $@
-
-merged.html: merged._md
-	cmark -t html --unsafe $^ > $@
-
-
 .PHONY: md
-md: merged._md
+md: $(MD_MERGED)
+
+.PHONY: index
+index: $(HTML_INDEX)
 
 .PHONY: html
-html: merged.html
+html: $(HTML_MERGED)
+
+
+.PHONY: all
+all: index md html
+	@echo "Building doc finished."
 
 
 .PHONY: clean
 clean:
-	rm -f merged.html *._md
+	rm -f $(MD_MERGED) $(HTML_INDEX) $(TMP_HTML_MERGE) $(HTML_MERGED)
