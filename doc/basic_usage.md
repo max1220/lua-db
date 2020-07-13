@@ -15,13 +15,32 @@ associated metatable methods that represent a drawing surface.
 
 A drawbuffer is created using the new_drawbuffer function from the core module.
 ```
-local db = ldb.new_drawbuffer(width, height, px_fmt)
+local drawbuffer = ldb.new_drawbuffer(width, height, px_fmt)
 ```
-
-`width` and `height` are in pixels and are required. `px_fmt` specifies the
-pixel format and is optional. By default, a 32bpp RGBA value is used.
 
 On success a drawbuffer usedata value is returned that has methods
 for interaction in it's metatable.
 
-On failure, nil and an error message is returned.
+You can now interact with these methods, for example:
+
+`drawbuffer:set_px(0,0, 255,0,0,255)`
+
+This would set the top-left pixel to red, full alpha.
+
+Because all drawbuffers share the same metatable, you can easily overload a
+function for all drawbuffers:
+
+```
+function draw_diagonal(db, len)
+	-- draw a pink diagonal line of specified length
+	for i=0, len-1 do
+		db:set_px(i,i, 255,0,0,255)
+	end
+end
+local mt = getmetatable(drawbuffer) -- get metatable of any drawbuffer
+mt.__index["draw_diagonal"] = draw_diagonal -- put into metatable for all drawbuffers
+drawbuffer:draw_diagonal(100) -- this works on all drawbuffers now
+```
+
+This is used in this library in `init.lua` to combine the different C modules
+and Lua modules to a unified interface.
