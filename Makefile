@@ -5,7 +5,7 @@ LUA_LIBDIR = $(LUA_DIR)/lib/lua/5.1
 LUA_SHAREDIR = $(LUA_DIR)/share/lua/5.1
 
 .PHONY: all
-all: build doc
+all: build doc test
 	@echo "-> Building finished."
 
 .PHONY: help
@@ -25,6 +25,10 @@ build:
 .PHONY: doc
 doc:
 	make -C doc/ all
+
+.PHONY: test
+test:
+	make -C tests/ all
 
 .PHONY: clean
 clean:
