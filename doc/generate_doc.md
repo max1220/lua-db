@@ -9,11 +9,17 @@ Usage:
 ```
 
 `tree` is the file path to a document tree in JSON or Lua format.
+
 `output` is the optional output file path(Default is stdout)
+
 `--merge` only merges the content(no menu, no anchors, default)
+
 `--plain` exports a merged pure markdown document with an unclickable menu(no HTML)
+
 `--html_anchor` exports markdown with HTML for local page anchors and a clickable HTML menu
+
 `--html_menu` only exports menu markdown with external links(no content)
+
 `--help` prints this message
 
 
