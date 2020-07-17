@@ -300,20 +300,20 @@ static inline float capsuleSDF(float px, float py, float ax, float ay, float bx,
     return sqrtf(dx * dx + dy * dy) - r;
 }
 
-static inline void line_anti_aliased(drawbuffer_t* db, int x0, int y0, int x1, int y1, uint8_t r, uint8_t g, uint8_t b, uint8_t a, float radius) {
+static inline void line_anti_aliased(drawbuffer_t* db, float x0, float y0, float x1, float y1, uint8_t r, uint8_t g, uint8_t b, uint8_t a, float radius) {
 	float alpha;
 	uint32_t sp, p;
 	int cx, cy;
 	uint32_t tp = ((uint32_t)r<<24) | ((uint32_t)g<<16) | ((uint32_t)b<<8);
 
-    int x_min = (int)floorf(fminf((float)x0, (float)x1) - radius);
-    int x_max = (int) ceilf(fmaxf((float)x0, (float)x1) + radius);
-    int y_min = (int)floorf(fminf((float)y0, (float)y1) - radius);
-    int y_max = (int) ceilf(fmaxf((float)y0, (float)y1) + radius);
+    int x_min = (int)floorf(fminf(x0, x1) - radius);
+    int x_max = (int) ceilf(fmaxf(x0, x1) + radius);
+    int y_min = (int)floorf(fminf(y0, y1) - radius);
+    int y_max = (int) ceilf(fmaxf(y0, y1) + radius);
 
     for (cy = y_min; cy <= y_max; cy++) {
 		for (cx = x_min; cx <= x_max; cx++) {
-			alpha = fmaxf(fminf(0.5f - capsuleSDF(cx, cy, (float)x0, (float)y0, (float)x1, (float)y1, radius), 1.0f), 0.0f)*(float)a;
+			alpha = fmaxf(fminf(0.5f - capsuleSDF(cx, cy, x0, y0, x1, y1, radius), 1.0f), 0.0f)*(float)a;
 			if (alpha>0) {
 				sp = ldb_get_px(db, cx, cy);
 				p = alphablend(sp, tp | ((uint32_t)alpha));
@@ -722,7 +722,7 @@ static int lua_gfx_floyd_steinberg(lua_State *L) {
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
 
-	int bpp = lua_tonumber(L, 2);
+	int bpp = lua_tointeger(L, 2);
 	if (bpp==1) {
 		floyd_steinberg_1bpp_r(db);
 		return 0;
@@ -805,10 +805,16 @@ static int lua_gfx_line(lua_State *L) {
 	drawbuffer_t* db;
 	LUA_LDB_CHECK_DB(L, 1, db)
 
-	int x0 = lua_tointeger(L, 2);
-	int y0 = lua_tointeger(L, 3);
-	int x1 = lua_tointeger(L, 4);
-	int y1 = lua_tointeger(L, 5);
+	float x0 = lua_tonumber(L, 2);
+	float y0 = lua_tonumber(L, 3);
+	float x1 = lua_tonumber(L, 4);
+	float y1 = lua_tonumber(L, 5);
+
+	// the integer coordinates are for the pixel-centers
+	int ix0 = x0+0.5;
+	int iy0 = y0+0.5;
+	int ix1 = x1+0.5;
+	int iy1 = y1+0.5;
 
 	int r = lua_tointeger(L, 6);
 	int g = lua_tointeger(L, 7);
@@ -823,6 +829,8 @@ static int lua_gfx_line(lua_State *L) {
 
 	float radius;
 	if (lua_isnumber(L, 10)) {
+		// draw using capsule signed distance function and alphablending(smooth edge)
+		// the SDF supports float coordinates in a usefull way
 		radius = lua_tonumber(L, 10);
 		if (radius <= 0) {
 			radius = 1;
@@ -830,10 +838,12 @@ static int lua_gfx_line(lua_State *L) {
 		line_anti_aliased(db, x0, y0, x1, y1, r,g,b,a, radius);
 		return 0;
 	} else if (lua_toboolean(L, 10)) {
-		line_alphablend(db, x0, y0, x1, y1, r,g,b,a);
+		// draw using Bresenham and alphablending(hard edge)
+		line_alphablend(db, ix0, iy0, ix1, iy1, r,g,b,a);
 		return 0;
 	} else {
-		line(db, x0, y0, x1, y1, r,g,b,a);
+		// draw using Bresenham(hard edge)
+		line(db, ix0, iy0, ix1, iy1, r,g,b,a);
 		return 0;
 	}
 }
