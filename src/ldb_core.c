@@ -162,9 +162,8 @@ static inline uint32_t get_px_1bpp_r(drawbuffer_t* db, int x, int y) {
 	uint8_t j = ((uint8_t*)db->data)[(y*db->w+x)/8];
 	if (j&(1<<(x&7))) {
 		return 0xffffffff;
-	} else {
-		return 0x000000ff;
 	}
+	return 0x000000ff;
 }
 
 static inline uint32_t get_px_8bpp_r(drawbuffer_t* db, int x, int y) {
@@ -288,7 +287,12 @@ uint32_t ldb_get_px(drawbuffer_t* db, int x, int y) {
 static int lua_drawbuffer_tostring(lua_State *L) {
 	// return a string with info about the drawbuffer to Lua
 	drawbuffer_t *db;
-	LUA_LDB_CHECK_DB(L, 1, db)
+	// can't use LUA_LDB_CHECK_DB(L, 1, db) because we want to return a string even if closed
+	db=(drawbuffer_t *)luaL_checkudata(L, 1, LDB_UDATA_NAME);
+	if (db==NULL) {
+		lua_pushstring(L, "Unknow");
+		return 1;
+	}
 
 	if (!db->data) {
 		lua_pushstring(L, "Closed Drawbuffer");
@@ -330,7 +334,8 @@ static int lua_drawbuffer_tostring(lua_State *L) {
 			lua_pushfstring(L, "32bpp BGRA Drawbuffer: %dx%d", db->w, db->h);
 			return 1;
 		default:
-			return 0;
+			lua_pushfstring(L, "Unknown Drawbuffer: %dx%d", db->w, db->h);
+			return 1;
 	}
 }
 
@@ -405,7 +410,7 @@ static int lua_drawbuffer_pixel_format(lua_State *L) {
 			str = "bgra8888";
 			break;
 		default:
-			str = "";
+			str = "Unknown pixel format";
 			break;
 	}
 
@@ -424,7 +429,8 @@ static int lua_drawbuffer_close(lua_State *L) {
 		db->data = NULL;
 	}
 
-	return 0;
+	lua_pushboolean(L, 1);
+	return 1;
 }
 
 
@@ -438,6 +444,10 @@ static int lua_drawbuffer_get_px(lua_State *L) {
 
 	int x = lua_tointeger(L, 2);
 	int y = lua_tointeger(L, 3);
+
+	if (x<0 || y<0 || x>=db->w || y>=db->h) {
+		return 0;
+	}
 
 	uint32_t px = ldb_get_px(db, x,y);
 
@@ -465,13 +475,14 @@ static int lua_drawbuffer_set_px(lua_State *L) {
 	int b = lua_tointeger(L, 6);
 	int a = lua_tointeger(L, 7);
 
-	if (r>255 || g>255 || b>255 || a>255 || r<0 || g<0 || b<0 || a<0 ) {
+	if (r>255 || g>255 || b>255 || a>255 || r<0 || g<0 || b<0 || a<0 || x<0 || y<0 || x>=db->w || y>=db->h) {
 		return 0;
 	}
 
 	ldb_set_px(db, x,y,r,g,b,a);
 
-	return 0;
+	lua_pushboolean(L, 1);
+	return 1;
 }
 
 static int lua_drawbuffer_clear(lua_State *L) {
@@ -495,7 +506,8 @@ static int lua_drawbuffer_clear(lua_State *L) {
 		}
 	}
 
-	return 0;
+	lua_pushboolean(L, 1);
+	return 1;
 }
 
 
@@ -523,7 +535,8 @@ static int lua_drawbuffer_load_data(lua_State *L) {
 
 	memcpy(db->data, str, data_len);
 
-	return 0;
+	lua_pushboolean(L, 1);
+	return 1;
 }
 
 
