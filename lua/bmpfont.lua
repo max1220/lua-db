@@ -141,6 +141,8 @@ function BMPFont.new_bmpfont(config)
 			self:draw_character(target_db, char, x+cx, y)
 			cx = cx + tile.w*self.scale_x + self.letter_spacing
 		end)
+		local len = cx - self.letter_spacing
+		return len
 	end
 
 	return font
