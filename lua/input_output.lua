@@ -88,14 +88,14 @@ function input_output.new_base(config)
 
 	function base:get_native_db(width, height)
 		-- get a drawbuffer of the specified dimensions in the prefered pixel format
-		return ldb_core.new_drawbuffer(width or self.output_width, height or self.output_height, self.target_format)
+		return ldb_core.new_drawbuffer(width or self.output_width, height or self.output_height, ldb_core.pixel_formats[self.target_format])
 	end
 
 	function base:target_resize(target_width, target_height)
 		-- user function. resize the target_db
 		self.target_width = math.floor(tonumber(target_width) or self.target_width)
 		self.target_height = math.floor(tonumber(target_height) or self.target_height)
-		self.target_db = ldb_core.new_drawbuffer(self.target_width, self.target_height, self.target_format)
+		self.target_db = ldb_core.new_drawbuffer(self.target_width, self.target_height, ldb_core.pixel_formats[self.target_format])
 		if self.on_target_resize then
 			self:on_target_resize(self.target_width, self.target_height)
 		end
@@ -106,7 +106,7 @@ function input_output.new_base(config)
 		self.output_width = math.floor(tonumber(output_width) or self.output_width)
 		self.output_height = math.floor(tonumber(output_height) or self.output_height)
 		if self.output_copy then
-			self.output_db = ldb_core.new_drawbuffer(self.output_width, self.output_height, self.output_format)
+			self.output_db = ldb_core.new_drawbuffer(self.output_width, self.output_height, ldb_core.pixel_formats[self.output_format])
 		end
 		if self.on_output_resize then
 			self:on_output_resize()
