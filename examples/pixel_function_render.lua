@@ -10,7 +10,7 @@ local w = args_parse.get_arg_num(arg, "render_width", 320)
 local h = args_parse.get_arg_num(arg, "render_height", 240)
 local duration = args_parse.get_arg_num(arg, "duration", 30)
 local fps = args_parse.get_arg_num(arg, "render_fps", 30)
-local sdf_path = args_parse.get_arg_str(arg, "sdf", "./examples/data/sdf_simple.lua")
+local callback_path = args_parse.get_arg_str(arg, "callback", "./examples/data/callback_sdf_shape.lua")
 local raw_path = args_parse.get_arg_str(arg, "rawfile", "tmp.raw")
 local preview_scale = args_parse.get_arg_num(arg, "preview_scale", 1)
 local threads = args_parse.get_arg_num(arg, "threads", effil.hardware_threads()+1)
@@ -54,17 +54,19 @@ state.render_now = 0
 
 logf("info","video parameters: width=%d height=%d duration=%d fps=%d frame_count=%d", w,h,duration,fps,frame_count)
 logf("info","render parameters: threads=%d stride=%d method=%s",threads,stride,method)
-logf("info","config parameters: preview_scale=%f sdf_path=%q raw_path=%q",preview_scale, sdf_path, raw_path)
+logf("info","config parameters: preview_scale=%f callback_path=%q raw_path=%q",preview_scale, callback_path, raw_path)
 
 
 local function per_worker_simple(w,h,bpp,worker_arg)
-	local callback = dofile(sdf_path)(w,h) -- load the SDF callback function for a width, height
-	local function per_frame_cb()
-		return state.render_now
+	local per_pixel_callback,per_frame_callback = dofile(callback_path)(w,h,bpp) -- load the callback function for a width, height
+	local function per_frame_cb(seq)
+		if per_frame_callback then
+			return per_frame_callback(seq, state)
+		end
 	end
 	local _min,_max,_floor,_char=math.min,math.max,math.floor,string.char
 	local function per_pixel_cb(x,y,buf,i,per_frame)
-		local r,g,b = callback(x,y,per_frame)
+		local r,g,b = per_pixel_callback(x,y,per_frame)
 		r = _max(_min(_floor(r),255),0)
 		g = _max(_min(_floor(g),255),0)
 		b = _max(_min(_floor(b),255),0)
@@ -73,12 +75,14 @@ local function per_worker_simple(w,h,bpp,worker_arg)
 	return per_pixel_cb,per_frame_cb
 end
 local function per_worker_ffi(w,h,bpp,stride,ffi,worker_arg)
-	local callback = dofile(sdf_path)(w,h) -- load the SDF callback function for a width, height
-	local function per_frame_cb()
-		return state.render_now
+	local per_pixel_callback,per_frame_callback = dofile(callback_path)(w,h,bpp) -- load the callback function for a width, height
+	local function per_frame_cb(seq)
+		if per_frame_callback then
+			return per_frame_callback(seq,state)
+		end
 	end
 	local function per_pixel_cb(x,y,buf,i,per_frame)
-		local r,g,b = callback(x,y,per_frame)
+		local r,g,b = per_pixel_callback(x,y,per_frame)
 		buf[i+0] = r
 		buf[i+1] = g
 		buf[i+2] = b

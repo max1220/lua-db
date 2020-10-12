@@ -5,10 +5,10 @@
 -- arg[3] = raw export file prefix
 local args_parse = require("lua-db.args_parse")
 local time = require("time")
-local multithread_pixel_function = require("lua-db.multithread_pixel_function")
+local pixel_function = require("lua-db.pixel_function")
 
 
-local sdf_path = args_parse.get_arg_str(arg, "sdf", "./examples/data/sdf_basic.lua")
+local callback_path = args_parse.get_arg_str(arg, "callback", "./examples/data/callback_basic.lua")
 local json_export = args_parse.empty_str_to_false(args_parse.get_arg_str(arg, "json", "benchmark.json")) -- path to export the data to
 local csv_export = args_parse.empty_str_to_false(args_parse.get_arg_str(arg, "csv")) -- if present, export csv to this path
 local raw_export = args_parse.empty_str_to_false(args_parse.get_arg_str(arg, "raw")) -- if present, export raw frame dump for every resolution to this prefix("_" + resolution + ".raw" is appended)
@@ -25,13 +25,16 @@ end
 local log,logf = args_parse.logger_from_args(arg, "info","warn","err","debug")
 
 local function per_worker_simple(w,h,bpp,worker_arg)
-	local function per_frame_cb()
-		return 0
+	local per_pixel_callback,per_frame_callback = dofile(callback_path)(w,h)
+	local state = {t=0,dt=1/30} -- TODO
+	local function per_frame_cb(seq)
+		if per_frame_callback then
+			return per_frame_callback(seq,state)
+		end
 	end
 	local _min,_max,_floor,_char = math.min,math.max,math.floor,string.char
-	local get_pixel = dofile(sdf_path)(w,h)
 	local function per_pixel_cb(x,y,buf,i,per_frame)
-		local r,g,b = get_pixel(x,y,per_frame)
+		local r,g,b = per_pixel_callback(x,y,per_frame)
 		r = _max(_min(_floor(r),255),0)
 		g = _max(_min(_floor(g),255),0)
 		b = _max(_min(_floor(b),255),0)
@@ -42,12 +45,15 @@ end
 
 
 local function per_worker_ffi(w,h,bpp,stride,ffi,worker_arg)
-	local function per_frame_cb()
-		return 0
+	local per_pixel_callback,per_frame_callback = dofile(callback_path)(w,h)
+	local state = {t=0,dt=1/30}
+	local function per_frame_cb(seq)
+		if per_frame_callback then
+			return per_frame_callback(seq, state)
+		end
 	end
-	local get_pixel = dofile(sdf_path)(w,h)
 	local function per_pixel_cb(x,y,buf,i,per_frame)
-		local r,g,b = get_pixel(x,y,per_frame)
+		local r,g,b = per_pixel_callback(x,y,per_frame)
 		buf[i+0] = r
 		buf[i+1] = g
 		buf[i+2] = b
@@ -64,11 +70,11 @@ local function run_test(w,h,frame_count)
 	local bpp = 3
 	local renderer
 	if method == "simple" then
-		renderer = multithread_pixel_function.multithread_pixel_function_simple(w,h,bpp,threads,per_worker_simple)
+		renderer = pixel_function.multithread_pixel_function_simple(w,h,bpp,threads,per_worker_simple)
 	elseif method == "ffi" then
-		renderer = multithread_pixel_function.multithread_pixel_function_ffi(w,h,bpp,threads,stride,per_worker_ffi)
+		renderer = pixel_function.multithread_pixel_function_ffi(w,h,bpp,threads,stride,per_worker_ffi)
 	elseif method == "ffi_shared_buf" then
-		renderer = multithread_pixel_function.multithread_pixel_function_ffi_shared_buf(w,h,bpp,threads,stride,per_worker_ffi, true)
+		renderer = pixel_function.multithread_pixel_function_ffi_shared_buf(w,h,bpp,threads,stride,per_worker_ffi, true)
 	end
 	renderer.start() -- start worker/collector threads
 
@@ -101,7 +107,7 @@ local function run_test(w,h,frame_count)
 	local mb = (w*h*3*frame_count)/1000000
 	local mb_per_second = mb/total
 
-	logf("resolution=%4dx%4d frame_count=%8d took %8.2fms: %8.2f MB/s, min=%8.2fms avg=%8.2fms max=%8.2fms, per_px=%fus mem=%dkb",
+	logf("info","resolution=%4dx%4d frame_count=%8d took %8.2fms: %8.2f MB/s, min=%8.2fms avg=%8.2fms max=%8.2fms, per_px=%fus mem=%dkb",
 			w,h, frame_count, total*1000, mb_per_second, min*1000, avg*1000, max*1000, per_px*1000*1000, dmem)
 
 	if json_export or csv_export then
@@ -125,7 +131,7 @@ end
 
 -- run benchmark
 local max_d = res_step*res_count -- resulting maximum dimension
-logf("Starting benchmark")
+logf("info","Starting benchmark")
 for i=1, res_count do
 	-- smaller resolutions have the frame count adjusted to equal pixel count
 	local d = i*res_step
@@ -136,14 +142,14 @@ end
 
 
 if json_export then -- export JSON
-	logf("Exporting JSON to %q", json_export)
+	logf("info","Exporting JSON to %q", json_export)
 	local json = require("cjson")
 	local file = assert(io.open(json_export, "w"))
 	file:write(json.encode(data))
 end
 
 if csv_export then -- export CSV
-	logf("Exporting CSV to %q", csv_export)
+	logf("info","Exporting CSV to %q", csv_export)
 	local file = assert(io.open(csv_export, "w"))
 	file:write("w,h,frame_count,total,min,avg,max,per_px,dmem\n")
 	for _, v in ipairs(data) do
@@ -151,4 +157,4 @@ if csv_export then -- export CSV
 	end
 end
 
-logf("End benchmark")
+logf("info","End benchmark")

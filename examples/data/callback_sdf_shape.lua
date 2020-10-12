@@ -1,22 +1,20 @@
 return function(w,h)
-
 	local _abs,_min,_max,_sqrt,_sin,_cos,_pi = math.abs,math.min,math.max,math.sqrt,math.sin,math.cos,math.pi
 
-	-- distance of x,y to a circle
+	-- distance of x,y to a circle centered at 0,0
 	local function circle_sdf(px,py,radius)
 		return _sqrt(px*px+py*py)-radius
 	end
 
-	-- distance of x,y to a box of width bw and height bh
+	-- distance of x,y to a box of width bw and height bh centered at 0,0
 	local function box_sdf(px,py,bw,bh)
-		local dx = _abs(px)-bw
-		local dy = _abs(py)-bh
+		local dx,dy = _abs(px)-bw, _abs(py)-bh
 		local d = _sqrt(_max(dx,0)^2+_max(dy,0)^2) + _min(_max(dx,dy),0.0)
 		return d
 	end
 
-	-- map a distance value to grey value(0-1)
-	local function map_v(px,py,d,t)
+	-- map a distance value to black/white color value(0-1). The border has a 2px wide grey transition.
+	local function map_v(d)
 		local p = 1/h
 		local border = p*2
 		local v = 1
@@ -53,22 +51,12 @@ return function(w,h)
 		return _min(_max(d1,-d2),d3)
 	end
 
-	--[[
-	local function clamp_rgb_range(r,g,b)
-		r = _min(_max(_floor(r*255),0),255)
-		g = _min(_max(_floor(g*255),0),255)
-		b = _min(_max(_floor(b*255),0),255)
-		return r,g,b
-	end
-	]]
-
-	-- callback for every pixel on a drawbuffer of format rgb888
+	-- callback for every pixel on a drawbuffer of format rgb888. Called in a seperate thread
 	local function get_pixel(x,y,per_frame)
-		local t = per_frame
+		local t = per_frame.t
 		local px,py = ((x/w)*2-1)*(w/h),(y/h)*2-1
 		local d = sdf(px,py,t)
-		local v = map_v(px,py,d,t)
-		--return clamp_rgb_range(v,v,v)
+		local v = map_v(d)
 		return v*255,v*255,v*255
 	end
 
