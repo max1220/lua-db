@@ -1,6 +1,90 @@
-local ffi = require("ffi")
+--[[
+# LuaJIT Vector library
+
+This file implements some vector utillity functions, and multiple
+conventions for using vector operations in Lua(mostly graphics/game programming).
+It has been designed for best performance with LuaJIT and it's FFI library in mind.
+Currently, only 2 or 3 component vectors are supported.
+
+
+# Usage
+
+```
+local vec2 = vector2(type, metafunctions)
+local vec3 = vector3(type, metafunctions)
+```
+
+type is a luajit ctype(can be a string like "double" or a userdata ctype reference; see LuaJIT FFI docs.)
+metafunctions is a boolean(If enabled, arithmetic metamethods are available)
+
+The vector2/vector3 functions return a FFI ctype that can be used to generate a new
+vector variable(See LuaJIT FFI docs for initialization rules).
+
+In general, most functions are available in 3 variants:
+
+ * No prefix usually means the last argument is target, a vector in which the result is stored in.
+   - `foo:add_v(bar, result)`
+ * "l_"-prefix means the target argument is the first function argument.
+   - `foo:l_add_v(bar)` is equal to `foo:add_v(bar, foo)`
+ * "n_"-prefix means the target argument is a new vector of the same type, and that new vector is returned.
+   - `local new = foo:n_add_v(bar)` is equal to `local new = vec3(); foo:add_v(bar, new)`
+   - this is also the default for the metamethods, and allows for an easy chaining syntax
+     * `local foo = vec3(0,0,0):n_add_v(1,2,3):n_mul_n(2)` is equal to `local foo = vec3(0,0,0) + vec3(1,2,3)*2`
+
+As you can see the metamethod syntax is clean, but might create more new vectors than needed, hindering performance.
+Vectors are (internally) always refered to by reference.
+
+
+## Available functions
+
+ * add_v,sub_v,add_n,sub_n,mul_n,mul_v,div,min_n,max_n,min_v,max_v,clamp,neg,zero,one,copy_to,len,normalize,abs,dotp,tostring,equals
+ * l_neg,l_normalize,l_abs,l_add_v,l_sub_v,l_add_n,l_sub_n,l_mul_n,l_mul_v,l_div,l_min_n,l_max_n,l_min_v,l_max_v,l_clamp
+ * n_neg,n_normalize,n_abs,n_add_v,n_sub_v,n_add_n,n_sub_n,n_mul_n,n_mul_v,n_div,n_min_n,n_max_n,n_min_v,n_max_v,n_clamp,n_copy,n_zero,n_one
+
+
+## Examples
+
+get a new vector type that uses float and supports metamethods(syntax sugar)
+
+```
+local vec3 = vector3("float", true)
+```
+
+create a new vector and initialize to 0,1,0
+```
+local dir = vec3(0,1,0)
+```
+
+normalize dir vector(All l_ prefixed functions store results in the vector before the ":"-invocation)
+```
+dir:l_normalize()
+```
+
+-- add dir to pos, store result in a new vector(newpos)
+```
+local newpos = vec3()
+pos:add_v(dir, newpos)
+```
+
+the meta-methods always wrap the n_ prefixed functions (creates a new vector for the result)
+```
+local newpos = pos + dir -- this is the same as the above example
+
+```
+
+
+
+]]
+
+-- TODO: Fallback version that works without LuaJIT(maybe only need compatible FFI library for PUC Lua?)
 -- TODO: matrix operations?
+-- TODO: generic version fort n-vectors?
 -- TODO: test assumed lower overhead of wrapping functions
+-- TODO: create proper benchmark + analysis tools(support luajit profiler, compare bytecode, etc.)
+
+local ffi = require("ffi")
+
+
 
 local function get_nwrap(type_cb)
 	local function nwrap0(fn)
