@@ -41,11 +41,12 @@ todo:
 .PHONY: install
 install: src/ldb_core.so
 	@echo "-> Installing in $(LUA_LIBDIR) and $(LUA_SHAREDIR)"
-	install -b -d $(LUA_LIBDIR)/
+	mkdir -p $(LUA_LIBDIR)/
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_core.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_gfx.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_sdl.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_fb.so
+	mkdir -p $(LUA_SHAREDIR)/
 	install -b -d $(LUA_SHAREDIR)/lua-db
 	install -b -d $(LUA_SHAREDIR)/lua-db/gui
 	install -b -t $(LUA_SHAREDIR)/lua-db lua/*.lua
