@@ -41,6 +41,7 @@ todo:
 .PHONY: install
 install: src/ldb_core.so
 	@echo "-> Installing in $(LUA_LIBDIR) and $(LUA_SHAREDIR)"
+	install -b -d $(LUA_LIBDIR)/
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_core.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_gfx.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_sdl.so
