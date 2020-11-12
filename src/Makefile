@@ -19,6 +19,7 @@ DRM_LIBS ?= -ldrm
 #DRM_CFLAGS = $(pkg-config --cflags libdrm)
 #DRM_LIBS = $(pkg-config --libs libdrm)
 
+STRIP ?= strip
 
 
 .PHONY: all
