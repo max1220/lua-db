@@ -2,7 +2,8 @@
 
 local print_table_sorted
 print_table_sorted = function (t, i)
-	local indent = ("\t"):rep(tonumber(i) or 0)
+	i = tonumber(i) or 9
+	local indent = ("\t"):rep(i)
 	local new_t = {}
 	for k,v in pairs(t) do
 		table.insert(new_t, {k=k,v=v})
