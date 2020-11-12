@@ -1,5 +1,5 @@
-CFLAGS ?= -g -fPIC -std=gnu99 -Wall -Wextra -Wpedantic
-#CFLAGS = -O3 -fPIC -std=gnu99 -Wall -Wextra -Wpedantic -march=native -mtune=native
+CFLAGS ?= -g -std=gnu99 -Wall -Wextra -Wpedantic
+#CFLAGS = -O3 -std=gnu99 -Wall -Wextra -Wpedantic -march=native -mtune=native
 LIBFLAG ?= -shared -fpic -lm -Wl,--as-needed
 
 # Lua configuration
@@ -72,7 +72,7 @@ clean:
 
 
 ldb_core.o: ldb_core.c
-	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) -c $^
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) -c $^
 
 ldb_core.so: ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS)
@@ -80,7 +80,7 @@ ldb_core.so: ldb_core.o
 
 
 ldb_gfx.o: ldb_gfx.c
-	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) -c $^
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) -c $^
 
 ldb_gfx.so: ldb_gfx.o ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS)
@@ -88,7 +88,7 @@ ldb_gfx.so: ldb_gfx.o ldb_core.o
 
 
 ldb_sdl.o: ldb_sdl.c
-	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) -c $^
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) -c $^
 
 ldb_sdl.so: ldb_sdl.o ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS) $(SDL_LIBS)
@@ -96,7 +96,7 @@ ldb_sdl.so: ldb_sdl.o ldb_core.o
 
 
 ldb_fb.o: ldb_fb.c
-	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) -c $^
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) -c $^
 
 ldb_fb.so: ldb_fb.o ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS)
@@ -104,7 +104,7 @@ ldb_fb.so: ldb_fb.o ldb_core.o
 
 
 ldb_drm.o: ldb_drm.c
-	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(DRM_CFLAGS) -c $^
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) $(DRM_CFLAGS) -c $^
 
 ldb_drm.so: ldb_drm.o ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(DRM_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS) $(DRM_LIBS)
