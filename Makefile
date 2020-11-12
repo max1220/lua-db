@@ -1,8 +1,7 @@
 # Install/Uninstall configuration
-PREFIX = /usr/local
-LUA_DIR = $(PREFIX)
-LUA_LIBDIR = $(LUA_DIR)/lib/lua/5.1
-LUA_SHAREDIR = $(LUA_DIR)/share/lua/5.1
+PREFIX ?= /usr/local
+LUA_LIBDIR ?= $(PREFIX)/lib/lua/5.1
+LUA_SHAREDIR ?= $(PREFIX)/share/lua/5.1
 
 .PHONY: all
 all: build doc test
@@ -40,8 +39,8 @@ todo:
 	rgrep --color -i -H -n -T "TODO"
 
 .PHONY: install
-install: build
-	@echo "-> Installing in $(PREFIX)"
+install: src/ldb_core.so
+	@echo "-> Installing in $(LUA_LIBDIR) and $(LUA_SHAREDIR)"
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_core.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_gfx.so
 	install -b -m 644 -t $(LUA_LIBDIR)/ src/ldb_sdl.so
@@ -54,7 +53,7 @@ install: build
 
 .PHONY: uninstall
 uninstall:
-	@echo "-> Uninstalling from $(PREFIX)"
+	@echo "-> Uninstalling from $(LUA_LIBDIR) and $(LUA_SHAREDIR)"
 	rm -f $(LUA_LIBDIR)/ldb_core.so
 	rm -f $(LUA_LIBDIR)/ldb_gfx.so
 	rm -f $(LUA_LIBDIR)/ldb_sdl.so
