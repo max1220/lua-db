@@ -96,10 +96,10 @@ ldb_sdl.so: ldb_sdl.o ldb_core.o
 
 
 ldb_fb.o: ldb_fb.c
-	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) -c $^
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) -c $^
 
 ldb_fb.so: ldb_fb.o ldb_core.o
-	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(SDL_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS)
+	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS)
 
 
 
