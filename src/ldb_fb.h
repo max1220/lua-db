@@ -6,7 +6,7 @@
 
 #define LDB_FB_UDATA_NAME "sdl2fb"
 
-#define CHECK_FRAMEBUFFER(L, I, D) D=(framebuffer_t *)luaL_checkudata(L, I, LDB_FB_UDATA_NAME); if ((D==NULL) || (fb->fd<0)) { lua_pushnil(L); lua_pushfstring(L, "Argument %d must be a framebuffer", I); return 2; }
+#define CHECK_FRAMEBUFFER(L, I, D) D=(framebuffer_t *)luaL_checkudata(L, I, LDB_FB_UDATA_NAME); if ((D==NULL) || (D->fd<0)) { lua_pushnil(L); lua_pushfstring(L, "Argument %d must be a framebuffer", I); return 2; }
 
 
 
