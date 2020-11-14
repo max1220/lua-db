@@ -8,6 +8,8 @@
 #include "ldb.h"
 
 
+
+// utillity macros
 #define LUA_T_PUSH_S_N(S, N) lua_pushstring(L, S); lua_pushnumber(L, N); lua_settable(L, -3);
 #define LUA_T_PUSH_S_I(S, N) lua_pushstring(L, S); lua_pushinteger(L, N); lua_settable(L, -3);
 #define LUA_T_PUSH_S_S(S, S2) lua_pushstring(L, S); lua_pushstring(L, S2); lua_settable(L, -3);
@@ -16,281 +18,47 @@
 
 
 
-static inline size_t get_data_size(PIX_FMT fmt, int w, int h) {
-	switch (fmt) {
-		case LDB_PXFMT_1BPP_R:
-			return (w*h)/8;
-		case LDB_PXFMT_8BPP_R:
-		case LDB_PXFMT_8BPP_RGB332:
-			return w*h;
-		case LDB_PXFMT_16BPP_RGB565:
-		case LDB_PXFMT_16BPP_BGR565:
-			return w*h*2;
-		case LDB_PXFMT_24BPP_RGB:
-		case LDB_PXFMT_24BPP_BGR:
-			return w*h*3;
-		case LDB_PXFMT_32BPP_RGBA:
-		case LDB_PXFMT_32BPP_ARGB:
-		case LDB_PXFMT_32BPP_ABGR:
-		case LDB_PXFMT_32BPP_BGRA:
-			return w*h*4;
-		default:
-			return 0;
+// get the cannoncial string representing the pixel format
+static const char* pixel_format_to_str(PIX_FMT fmt) {
+	switch(fmt) {
+		case LDB_PXFMT_1BPP_R: return "r1";
+		case LDB_PXFMT_8BPP_R: return "r8";
+		case LDB_PXFMT_8BPP_RGB332: return "rgb332";
+		case LDB_PXFMT_16BPP_RGB565: return "rgb565";
+		case LDB_PXFMT_16BPP_BGR565: return "bgr565";
+		case LDB_PXFMT_24BPP_RGB: return "rgb888";
+		case LDB_PXFMT_24BPP_BGR: return "bgr888";
+		case LDB_PXFMT_32BPP_RGBA: return "rgba8888";
+		case LDB_PXFMT_32BPP_ARGB: return "argb8888";
+		case LDB_PXFMT_32BPP_ABGR: return "abgr8888";
+		case LDB_PXFMT_32BPP_BGRA: return "bgra8888";
+		default: return "Unknown";
 	}
 }
 
-static inline void set_px_1bpp_r(drawbuffer_t* db, int x, int y, uint8_t v) {
-	uint8_t j = ((uint8_t*)db->data)[(y*db->w+x)/8];
-	uint8_t i = 1<<(x%8);
-	if (v) {
-		j = j | i;
-	} else {
-		j = j & (~i);
-	}
-	((uint8_t*)db->data)[(y*db->w+x)/8] = j;
+// get the pixel format number from a pixel format string
+static PIX_FMT str_to_pixel_format(const char* str) {
+	if (strcmp(str, "r1")) { return LDB_PXFMT_1BPP_R; }
+	else if (strcmp(str, "r1")) { return LDB_PXFMT_1BPP_R; }
+	else if (strcmp(str, "r8")) { return LDB_PXFMT_8BPP_R; }
+	else if (strcmp(str, "rgb332")) { return LDB_PXFMT_8BPP_RGB332; }
+	else if (strcmp(str, "rgb565")) { return LDB_PXFMT_16BPP_RGB565; }
+	else if (strcmp(str, "bgr565")) { return LDB_PXFMT_16BPP_BGR565; }
+	else if (strcmp(str, "rgb888")) { return LDB_PXFMT_24BPP_RGB; }
+	else if (strcmp(str, "bgr888")) { return LDB_PXFMT_24BPP_BGR; }
+	else if (strcmp(str, "rgba8888")) { return LDB_PXFMT_32BPP_RGBA; }
+	else if (strcmp(str, "argb8888")) { return LDB_PXFMT_32BPP_ARGB; }
+	else if (strcmp(str, "abgr8888")) { return LDB_PXFMT_32BPP_ABGR; }
+	else if (strcmp(str, "bgra8888")) { return LDB_PXFMT_32BPP_BGRA; }
+	return LDB_PXFMT_MAX;
 }
 
-static inline void set_px_8bpp_r(drawbuffer_t* db, int x, int y, uint8_t v) {
-	((uint8_t*)db->data)[y*db->w+x] = v;
-}
-
-static inline void set_px_8bpp_rgb332(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-	uint8_t v = (r&0xe0) | ((g&0xe0)>>3) | ((b&0xc0)>>6);
-	((uint8_t*)db->data)[y*db->w+x] = v;
-}
-
-
-static inline void set_px_16bpp_rgb565(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-	uint16_t v = (((uint16_t)(r&0xF8))<<8) | (((uint16_t)(g&0xFC))<<3) | (((uint16_t)(b&0xF8))>>3);
-	((uint16_t*)db->data)[y*db->w+x] = v;
-}
-
-static inline void set_px_16bpp_bgr565(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-	uint16_t v = (((uint16_t)(r&0xF8))>>3) | (((uint16_t)(b&0xF8))<<8) | (((uint16_t)(g&0xFC))<<3);
-	((uint16_t*)db->data)[y*db->w+x] = v;
-}
-
-
-static inline void set_px_24bpp_rgb(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-	((uint8_t*)db->data)[(y*db->w+x)*3] = r;
-	((uint8_t*)db->data)[(y*db->w+x)*3+1] = g;
-	((uint8_t*)db->data)[(y*db->w+x)*3+2] = b;
-}
-
-static inline void set_px_24bpp_bgr(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b) {
-	((uint8_t*)db->data)[(y*db->w+x)*3] = b;
-	((uint8_t*)db->data)[(y*db->w+x)*3+1] = g;
-	((uint8_t*)db->data)[(y*db->w+x)*3+2] = r;
-}
-
-
-static inline void set_px_32bpp_rgba(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	((uint8_t*)db->data)[(y*db->w+x)*4] = r;
-	((uint8_t*)db->data)[(y*db->w+x)*4+1] = g;
-	((uint8_t*)db->data)[(y*db->w+x)*4+2] = b;
-	((uint8_t*)db->data)[(y*db->w+x)*4+3] = a;
-}
-
-static inline void set_px_32bpp_argb(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	((uint8_t*)db->data)[(y*db->w+x)*4] = a;
-	((uint8_t*)db->data)[(y*db->w+x)*4+1] = r;
-	((uint8_t*)db->data)[(y*db->w+x)*4+2] = g;
-	((uint8_t*)db->data)[(y*db->w+x)*4+3] = b;
-}
-
-static inline void set_px_32bpp_abgr(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	((uint8_t*)db->data)[(y*db->w+x)*4] = a;
-	((uint8_t*)db->data)[(y*db->w+x)*4+1] = b;
-	((uint8_t*)db->data)[(y*db->w+x)*4+2] = g;
-	((uint8_t*)db->data)[(y*db->w+x)*4+3] = r;
-}
-
-static inline void set_px_32bpp_bgra(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	((uint8_t*)db->data)[(y*db->w+x)*4] = b;
-	((uint8_t*)db->data)[(y*db->w+x)*4+1] = g;
-	((uint8_t*)db->data)[(y*db->w+x)*4+2] = r;
-	((uint8_t*)db->data)[(y*db->w+x)*4+3] = a;
-}
-
-
-void ldb_set_px(drawbuffer_t* db, int x, int y, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	if ((x<0) || (y<0) || (x>=db->w) || (y>=db->h) || (!db->data)) {
-		return;
-	}
-	switch (db->pxfmt) {
-		case LDB_PXFMT_1BPP_R:
-			set_px_1bpp_r(db, x, y, r);
-			break;
-		case LDB_PXFMT_8BPP_R:
-			set_px_8bpp_r(db, x, y, r);
-			break;
-		case LDB_PXFMT_8BPP_RGB332:
-			set_px_8bpp_rgb332(db, x, y, r, g, b);
-			break;
-		case LDB_PXFMT_16BPP_RGB565:
-			set_px_16bpp_rgb565(db, x, y, r, g, b);
-			break;
-		case LDB_PXFMT_16BPP_BGR565:
-			set_px_16bpp_bgr565(db, x, y, r, g, b);
-			break;
-		case LDB_PXFMT_24BPP_RGB:
-			set_px_24bpp_rgb(db, x, y, r, g, b);
-			break;
-		case LDB_PXFMT_24BPP_BGR:
-			set_px_24bpp_rgb(db, x, y, r, g, b);
-			break;
-		case LDB_PXFMT_32BPP_RGBA:
-			set_px_32bpp_rgba(db, x, y, r, g, b, a);
-			break;
-		case LDB_PXFMT_32BPP_ARGB:
-			set_px_32bpp_argb(db, x, y, r, g, b, a);
-			break;
-		case LDB_PXFMT_32BPP_ABGR:
-			set_px_32bpp_abgr(db, x, y, r, g, b, a);
-			break;
-		case LDB_PXFMT_32BPP_BGRA:
-			set_px_32bpp_bgra(db, x, y, r, g, b, a);
-			break;
-		default:
-			break;
-	}
-}
-
-
-
-static inline uint32_t get_px_1bpp_r(drawbuffer_t* db, int x, int y) {
-	uint8_t j = ((uint8_t*)db->data)[(y*db->w+x)/8];
-	if (j&(1<<(x&7))) {
-		return 0xffffffff;
-	}
-	return 0x000000ff;
-}
-
-static inline uint32_t get_px_8bpp_r(drawbuffer_t* db, int x, int y) {
-	uint8_t v = ((uint8_t*)db->data)[y*db->w+x];
-	return (((uint32_t)v)<<24) | (((uint32_t)v)<<16) | (((uint32_t)v)<<8) | 0xff;
-}
-
-static inline uint32_t get_px_8bpp_rgb332(drawbuffer_t* db, int x, int y) {
-	uint8_t v = ((uint8_t*)db->data)[y*db->w+x];
-	return (((uint32_t)(v&0xe0))<<24) | (((uint32_t)(v&0x1c))<<19) | (((uint32_t)(v&0x03))<<14) | 0xff;
-}
-
-
-static inline uint32_t get_px_16bpp_rgb565(drawbuffer_t* db, int x, int y) {
-	uint16_t j = ((uint16_t*)db->data)[y*db->w+x];
-	uint32_t v = 0x000000FF;
-	v |= (uint32_t)(j&0xf800)<<16;
-	v |= (uint32_t)(j&0x07E0)<<13;
-	v |= (uint32_t)(j&0x001f)<<11;
-	return v;
-}
-
-static inline uint32_t get_px_16bpp_bgr565(drawbuffer_t* db, int x, int y) {
-	uint16_t j = ((uint16_t*)db->data)[y*db->w+x];
-	uint32_t v = 0x000000FF;
-	v |= (uint32_t)(j&0xf800);
-	v |= (uint32_t)(j&0x07E0)<<13;
-	v |= (uint32_t)(j&0x001f)<<27;
-	return v;
-}
-
-
-static inline uint32_t get_px_24bpp_rgb(drawbuffer_t* db, int x, int y) {
-	uint32_t v = 0x000000FF;
-	v |= (uint8_t)(((uint8_t*)db->data)[(y*db->w+x)*3])<<24;
-	v |= (uint8_t)(((uint8_t*)db->data)[(y*db->w+x)*3+1])<<16;
-	v |= (uint8_t)(((uint8_t*)db->data)[(y*db->w+x)*3+2])<<8;
-	return v;
-}
-
-static inline uint32_t get_px_24bpp_bgr(drawbuffer_t* db, int x, int y) {
-	uint32_t v = 0x000000FF;
-	v |= (uint8_t)(((uint8_t*)db->data)[(y*db->w+x)*3+2])<<24;
-	v |= (uint8_t)(((uint8_t*)db->data)[(y*db->w+x)*3+1])<<16;
-	v |= (uint8_t)(((uint8_t*)db->data)[(y*db->w+x)*3])<<8;
-	return v;
-}
-
-
-static inline uint32_t get_px_32bpp_rgba(drawbuffer_t* db, int x, int y) {
-	uint32_t v = 0x00000000;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4])<<24;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+1])<<16;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+2])<<8;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+3]);
-	return v;
-}
-
-static inline uint32_t get_px_32bpp_argb(drawbuffer_t* db, int x, int y) {
-	uint32_t v = 0x00000000;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4]);
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+1])<<24;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+2])<<16;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+3])<<8;
-	return v;
-}
-
-static inline uint32_t get_px_32bpp_abgr(drawbuffer_t* db, int x, int y) {
-	uint32_t v = 0x00000000;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4]);
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+1])<<8;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+2])<<16;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+3])<<24;
-	return v;
-}
-
-static inline uint32_t get_px_32bpp_bgra(drawbuffer_t* db, int x, int y) {
-	uint32_t v = 0x00000000;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4])<<8;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+1])<<16;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+2])<<24;
-	v |= (uint32_t)(((uint8_t*)db->data)[(y*db->w+x)*4+3]);
-	return v;
-}
-
-
-uint32_t ldb_get_px(drawbuffer_t* db, int x, int y) {
-	if ((x<0) || (y<0) || (x>=db->w) || (y>=db->h) || (!db->data)) {
-		return 0;
-	}
-	switch (db->pxfmt) {
-		case LDB_PXFMT_1BPP_R:
-			return get_px_1bpp_r(db, x, y);
-		case LDB_PXFMT_8BPP_R:
-			return get_px_8bpp_r(db, x, y);
-		case LDB_PXFMT_8BPP_RGB332:
-			return get_px_8bpp_rgb332(db, x, y);
-		case LDB_PXFMT_16BPP_RGB565:
-			return get_px_16bpp_rgb565(db, x, y);
-		case LDB_PXFMT_16BPP_BGR565:
-			return get_px_16bpp_bgr565(db, x, y);
-		case LDB_PXFMT_24BPP_RGB:
-			return get_px_24bpp_rgb(db, x, y);
-		case LDB_PXFMT_24BPP_BGR:
-			return get_px_24bpp_rgb(db, x, y);
-		case LDB_PXFMT_32BPP_RGBA:
-			return get_px_32bpp_rgba(db, x, y);
-		case LDB_PXFMT_32BPP_ARGB:
-			return get_px_32bpp_argb(db, x, y);
-		case LDB_PXFMT_32BPP_ABGR:
-			return get_px_32bpp_abgr(db, x, y);
-		case LDB_PXFMT_32BPP_BGRA:
-			return get_px_32bpp_bgra(db, x, y);
-		default:
-			return 0;
-	}
-}
-
-
-
+// return a string with info about the drawbuffer to Lua
 static int lua_drawbuffer_tostring(lua_State *L) {
-	// return a string with info about the drawbuffer to Lua
-	drawbuffer_t *db;
 	// can't use LUA_LDB_CHECK_DB(L, 1, db) because we want to return a string even if closed
-	db=(drawbuffer_t *)luaL_checkudata(L, 1, LDB_UDATA_NAME);
+	drawbuffer_t *db = luaL_checkudata(L, 1, LDB_UDATA_NAME);
 	if (db==NULL) {
-		lua_pushstring(L, "Unknow");
+		lua_pushstring(L, "Unknown");
 		return 1;
 	}
 
@@ -301,10 +69,10 @@ static int lua_drawbuffer_tostring(lua_State *L) {
 
 	switch (db->pxfmt) {
 		case LDB_PXFMT_1BPP_R:
-			lua_pushfstring(L, "1bpp R Drawbuffer: %dx%d", db->w, db->h);
+			lua_pushfstring(L, "1bpp Drawbuffer: %dx%d", db->w, db->h);
 			return 1;
 		case LDB_PXFMT_8BPP_R:
-			lua_pushfstring(L, "8bpp R Drawbuffer: %dx%d", db->w, db->h);
+			lua_pushfstring(L, "8bpp Drawbuffer: %dx%d", db->w, db->h);
 			return 1;
 		case LDB_PXFMT_8BPP_RGB332:
 			lua_pushfstring(L, "8bpp RGB332 Drawbuffer: %dx%d", db->w, db->h);
@@ -339,8 +107,8 @@ static int lua_drawbuffer_tostring(lua_State *L) {
 	}
 }
 
+// return length of pixel data in bytes to Lua
 static int lua_drawbuffer_bytelen(lua_State *L) {
-	// return length of pixel data in bytes to Lua
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
 
@@ -348,81 +116,38 @@ static int lua_drawbuffer_bytelen(lua_State *L) {
 	return 1;
 }
 
+// return the width of a drawbuffer to Lua
 static int lua_drawbuffer_width(lua_State *L) {
-	// return the width of a drawbuffer to Lua
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
 
 	lua_pushinteger(L, db->w);
-
 	return 1;
 }
 
+// return the height of a drawbuffer to Lua
 static int lua_drawbuffer_height(lua_State *L) {
-	// return the height of a drawbuffer to Lua
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
 
 	lua_pushinteger(L, db->h);
-
 	return 1;
 }
 
+// return the pixel format as a string
 static int lua_drawbuffer_pixel_format(lua_State *L) {
-	// return the pixel format as a string
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
 
-	const char* str;
-
-	switch(db->pxfmt) {
-		case LDB_PXFMT_1BPP_R:
-			str = "r1";
-			break;
-		case LDB_PXFMT_8BPP_R:
-			str = "r8";
-			break;
-		case LDB_PXFMT_8BPP_RGB332:
-			str = "rgb332";
-			break;
-		case LDB_PXFMT_16BPP_RGB565:
-			str = "rgb565";
-			break;
-		case LDB_PXFMT_16BPP_BGR565:
-			str = "bgr565";
-			break;
-		case LDB_PXFMT_24BPP_RGB:
-			str = "rgb888";
-			break;
-		case LDB_PXFMT_24BPP_BGR:
-			str = "bgr888";
-			break;
-		case LDB_PXFMT_32BPP_RGBA:
-			str = "rgba8888";
-			break;
-		case LDB_PXFMT_32BPP_ARGB:
-			str = "argb8888";
-			break;
-		case LDB_PXFMT_32BPP_ABGR:
-			str = "abgr8888";
-			break;
-		case LDB_PXFMT_32BPP_BGRA:
-			str = "bgra8888";
-			break;
-		default:
-			str = "Unknown pixel format";
-			break;
-	}
-
-	lua_pushstring(L, str);
+	lua_pushstring(L, pixel_format_to_str(db->pxfmt));
 	return 1;
 }
 
+// close an instance of a drawbuffer, calling free() on the allocated
+// memory, if needed. Automatically called by the Lua GC
 static int lua_drawbuffer_close(lua_State *L) {
-	// close an instance of a drawbuffer, calling free() on the allocated
-	// memory, if needed. Automatically called by the Lua GC
 	drawbuffer_t *db;
-	LUA_LDB_CHECK_DB(L, 1, db)
+ 	LUA_LDB_CHECK_DB(L, 1, db)
 
 	if (db->data) {
 		free(db->data);
@@ -433,15 +158,13 @@ static int lua_drawbuffer_close(lua_State *L) {
 	return 1;
 }
 
-
+// return r,g,b,a value for the drawbuffer at x,y
 static int lua_drawbuffer_get_px(lua_State *L) {
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
-
 	if (!lua_isnumber(L, 2) || !lua_isnumber(L, 3)) {
 		return 0;
 	}
-
 	int x = lua_tointeger(L, 2);
 	int y = lua_tointeger(L, 3);
 
@@ -449,60 +172,61 @@ static int lua_drawbuffer_get_px(lua_State *L) {
 		return 0;
 	}
 
-	uint32_t px = ldb_get_px(db, x,y);
+	uint32_t p = get_px(db->data, db->w, x,y, db->pxfmt);
 
-	lua_pushinteger(L, (px&0xff000000)>>24);
-	lua_pushinteger(L, (px&0x00ff0000)>>16);
-	lua_pushinteger(L, (px&0x0000ff00)>>8);
-	lua_pushinteger(L, px&0xff);
-
+	lua_pushinteger(L, unpack_pixel_r(p));
+	lua_pushinteger(L, unpack_pixel_g(p));
+	lua_pushinteger(L, unpack_pixel_b(p));
+	lua_pushinteger(L, unpack_pixel_a(p));
 	return 4;
 }
 
+// set r,g,b,a value for the drawbuffer at x,y
 static int lua_drawbuffer_set_px(lua_State *L) {
 	drawbuffer_t *db;
 	LUA_LDB_CHECK_DB(L, 1, db)
-
 	if (!lua_isnumber(L, 2) || !lua_isnumber(L, 3)) {
 		return 0;
 	}
-
 	int x = lua_tointeger(L, 2);
 	int y = lua_tointeger(L, 3);
-
 	int r = lua_tointeger(L, 4);
 	int g = lua_tointeger(L, 5);
 	int b = lua_tointeger(L, 6);
 	int a = lua_tointeger(L, 7);
-
-	if (r>255 || g>255 || b>255 || a>255 || r<0 || g<0 || b<0 || a<0 || x<0 || y<0 || x>=db->w || y>=db->h) {
+	if ((r>255) || (g>255) || (b>255) || (a>255) || (r<0) || (g<0) || (b<0) || (a<0) || (x<0) || (y<0) || (x>=db->w) || (y>=db->h)) {
 		return 0;
 	}
 
-	ldb_set_px(db, x,y,r,g,b,a);
+	uint32_t p = pack_pixel_rgba(r,g,b,a);
+	set_px(db->data, db->w, x,y, p, db->pxfmt);
 
 	lua_pushboolean(L, 1);
 	return 1;
 }
 
+// clear the drawbuffer in a uniform color
 static int lua_drawbuffer_clear(lua_State *L) {
-	// clear the drawbuffer in a uniform color
 	drawbuffer_t *db = (drawbuffer_t *)lua_touserdata(L, 1);
 	LUA_LDB_CHECK_DB(L, 1, db)
-
 	int r = lua_tointeger(L, 2);
 	int g = lua_tointeger(L, 3);
 	int b = lua_tointeger(L, 4);
 	int a = lua_tointeger(L, 5);
-
 	if ( (r < 0) || (g < 0) || (b < 0) || (a < 0) || (r > 255) || (g > 255) || (b > 255) || (a > 255) ) {
 		return 0;
 	}
 
-	//TODO: Fastpath using memset
-	for (int y = 0; y < db->h; y++) {
-		for (int x = 0; x < db->w; x++) {
-			ldb_set_px(db, x, y, r, g, b, a);
+	uint32_t p = pack_pixel_rgba(r,g,b,a);
+
+	if ( (r==g) && (g==b) && (b==a) && (db->pxfmt>=LDB_PXFMT_24BPP_RGB) ) {
+		// fastpath
+		memset(db->data, r, get_data_size(db->pxfmt, db->w, db->h));
+	} else {
+		for (int y = 0; y < db->h; y++) {
+			for (int x = 0; x < db->w; x++) {
+				set_px(db->data, db->w, x,y, p, db->pxfmt);
+			}
 		}
 	}
 
@@ -510,7 +234,7 @@ static int lua_drawbuffer_clear(lua_State *L) {
 	return 1;
 }
 
-
+// return the internal drabuffer pixel data as a string
 static int lua_drawbuffer_dump_data(lua_State *L) {
 	drawbuffer_t *db = (drawbuffer_t *)lua_touserdata(L, 1);
 	LUA_LDB_CHECK_DB(L, 1, db)
@@ -519,6 +243,7 @@ static int lua_drawbuffer_dump_data(lua_State *L) {
 	return 1;
 }
 
+// load drabuffer pixel data from a string
 static int lua_drawbuffer_load_data(lua_State *L) {
 	drawbuffer_t *db = (drawbuffer_t *)lua_touserdata(L, 1);
 	LUA_LDB_CHECK_DB(L, 1, db)
@@ -541,8 +266,8 @@ static int lua_drawbuffer_load_data(lua_State *L) {
 
 
 
+// create a new drawbuffer userdata object
 static int lua_new_drawbuffer(lua_State *L) {
-
 	// Check if we have width and height
 	if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
 		lua_pushnil(L);
@@ -560,21 +285,20 @@ static int lua_new_drawbuffer(lua_State *L) {
 		return 2;
 	}
 
-
 	// check for pixel format argument(default rgba)
 	PIX_FMT fmt = LDB_PXFMT_32BPP_RGBA;
-	if (lua_isnumber(L, 3)) {
-		fmt = lua_tointeger(L, 3);
-		if (fmt >= LDB_PXFMT_MAX) {
-			lua_pushnil(L);
-			lua_pushstring(L, "Unknown format!");
-			return 2;
-		}
+	if (lua_isstring(L, 3)) {
+		const char* fmt_str = lua_tostring(L, 3);
+		fmt = str_to_pixel_format(fmt_str);
+	}
+	if (fmt >= LDB_PXFMT_MAX) {
+		lua_pushnil(L);
+		lua_pushstring(L, "Unknown format!");
+		return 2;
 	}
 
 	// determine length of pixel buffer
 	size_t len = get_data_size(fmt, w, h);
-
 
 	// Create new userdata object
 	drawbuffer_t *db = (drawbuffer_t *)lua_newuserdata(L, sizeof(drawbuffer_t));
@@ -623,6 +347,7 @@ static int lua_new_drawbuffer(lua_State *L) {
 }
 
 
+
 // when the module is require()'ed, return a table with the new_drawbuffer function, and some constants
 LUALIB_API int luaopen_ldb_core(lua_State *L) {
 	lua_newtable(L);
@@ -632,17 +357,6 @@ LUALIB_API int luaopen_ldb_core(lua_State *L) {
 
 	lua_pushstring(L, "pixel_formats");
 	lua_newtable(L);
-	LUA_T_PUSH_S_I("r1", LDB_PXFMT_1BPP_R)
-	LUA_T_PUSH_S_I("r8", LDB_PXFMT_8BPP_R)
-	LUA_T_PUSH_S_I("rgb332", LDB_PXFMT_8BPP_RGB332)
-	LUA_T_PUSH_S_I("rgb565", LDB_PXFMT_16BPP_RGB565)
-	LUA_T_PUSH_S_I("bgr565", LDB_PXFMT_16BPP_BGR565)
-	LUA_T_PUSH_S_I("rgb888", LDB_PXFMT_24BPP_RGB)
-	LUA_T_PUSH_S_I("bgr888", LDB_PXFMT_24BPP_BGR)
-	LUA_T_PUSH_S_I("rgba8888", LDB_PXFMT_32BPP_RGBA)
-	LUA_T_PUSH_S_I("argb8888", LDB_PXFMT_32BPP_ARGB)
-	LUA_T_PUSH_S_I("abgr8888", LDB_PXFMT_32BPP_ABGR)
-	LUA_T_PUSH_S_I("bgra8888", LDB_PXFMT_32BPP_BGRA)
 
 	lua_settable(L, -3);
 

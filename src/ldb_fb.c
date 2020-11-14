@@ -109,7 +109,7 @@ static int lua_framebuffer_copy_from_db(lua_State *L) {
 	} else if (fb->vinfo.bits_per_pixel == 32) {
 		for (cy=0; cy < db->h; cy++) {
 			for (cx=0; cx < db->w; cx++) {
-				sp = ldb_get_px(db, cx,cy);
+				sp = get_px(db->data, db->w, cx,cy, db->pxfmt);
 				// TODO: Support all pixel formats for the frambebuffer
 				i = (cy*db->w+cx)*4;
 				((uint8_t*)fb->data)[i] = (uint8_t)((sp&0x0000FF00)>>8);
@@ -138,10 +138,10 @@ static int lua_framebuffer_close(lua_State *L) {
         close(fb->fd);
         fb->fd = -1;
     }
-	//if (fb->fbdev) {
-	//	free(fb->fbdev);
-	//	fb->fbdev = NULL;
-	//}
+	if (fb->fbdev) {
+		free(fb->fbdev);
+		fb->fbdev = NULL;
+	}
 	if (fb->data) {
 		munmap(fb->data, fb->finfo.smem_len);
 		fb->data = NULL;
@@ -181,8 +181,7 @@ static int lua_fb_new_framebuffer(lua_State *L) {
 
 	// put new userdata on stack
 	framebuffer_t *fb = (framebuffer_t*)lua_newuserdata(L, sizeof(framebuffer_t));
-
-	//fb->fbdev = strndup(char, fbdev_len);
+	fb->fbdev = strndup(fbdev, fbdev_len);
 
 	// open the framebuffer device in /dev
     fb->fd = open(fbdev, O_RDWR);

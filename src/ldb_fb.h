@@ -14,7 +14,7 @@ typedef struct {
     int fd;
     struct fb_fix_screeninfo finfo;
     struct fb_var_screeninfo vinfo;
-    //char *fbdev;
+    char *fbdev;
     uint8_t *data;
 } framebuffer_t;
 

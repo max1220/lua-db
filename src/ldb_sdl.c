@@ -216,8 +216,7 @@ static int lua_sdl2fb_draw_from_drawbuffer(lua_State *L) {
 	            if (x+cx < 0 || y+cy < 0 || x+cx >= sdl2fb->w || y+cy >= sdl2fb->h) {
 	                continue;
 	            } else {
-	                // set pixel
-					sp = ldb_get_px(db, cx,cy);
+					sp = get_px(db->data, db->w, cx,cy, db->pxfmt);
 					sdl_p = SDL_MapRGBA(screen->format, (sp&0xFF000000)>>24, (sp&0x00FF0000)>>16, (sp&0x0000FF00)>>8, sp&0xff);
 					sdl2fb_set_px(sdl2fb, cx+x,cy+y, sdl_p);
 	            }

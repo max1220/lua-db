@@ -5,9 +5,9 @@
 #include <xf86drm.h>
 #include <xf86drmMode.h>
 
-#define LDB_DRM_UDATA_NAME "DRM"
+#define LDB_DRM_UDATA_NAME "DRMCard"
 
-#define CHECK_DRM(L, I, D) D=(drm_t *)luaL_checkudata(L, I, LDB_DRM_UDATA_NAME); if ((D==NULL) || (D->fd<0)) { lua_pushnil(L); lua_pushfstring(L, "Argument %d must be a DRM device", I); return 2; }
+#define CHECK_DRM(L, I, D) D=(drm_t *)luaL_checkudata(L, I, LDB_DRM_UDATA_NAME); if ((D==NULL) || (D->fd<0)) { lua_pushnil(L); lua_pushfstring(L, "Argument %d must be a DRM card", I); return 2; }
 
 
 /*

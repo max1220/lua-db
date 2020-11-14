@@ -36,30 +36,6 @@ static inline uint32_t alphablend(uint32_t sp, uint32_t tp) {
 	return ret;
 }
 
-// TODO: include this in the header?
-static inline size_t get_data_size(PIX_FMT fmt, int w, int h) {
-	switch (fmt) {
-		case LDB_PXFMT_1BPP_R:
-			return (w*h)/8;
-		case LDB_PXFMT_8BPP_R:
-		case LDB_PXFMT_8BPP_RGB332:
-			return w*h;
-		case LDB_PXFMT_16BPP_RGB565:
-		case LDB_PXFMT_16BPP_BGR565:
-			return w*h*2;
-		case LDB_PXFMT_24BPP_RGB:
-		case LDB_PXFMT_24BPP_BGR:
-			return w*h*3;
-		case LDB_PXFMT_32BPP_RGBA:
-		case LDB_PXFMT_32BPP_ARGB:
-		case LDB_PXFMT_32BPP_ABGR:
-		case LDB_PXFMT_32BPP_BGRA:
-			return w*h*4;
-		default:
-			return 0;
-	}
-}
-
 static inline void draw_origin_to_target(drawbuffer_t* origin_db, drawbuffer_t* target_db, int target_x, int target_y, int origin_x, int origin_y, int w, int h) {
 	int cx,cy;
 	uint32_t p;
@@ -71,8 +47,8 @@ static inline void draw_origin_to_target(drawbuffer_t* origin_db, drawbuffer_t* 
 	//}
 	for (cy = 0; cy < h; cy++) {
 		for (cx = 0; cx < w; cx++) {
-			p = ldb_get_px(origin_db, cx+origin_x,cy+origin_y);
-			ldb_set_px(target_db, cx+target_x, cy+target_y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+			p = db_get_px(origin_db, cx+origin_x,cy+origin_y);
+			db_set_px(target_db, cx+target_x, cy+target_y, p);
 		}
 	}
 }
@@ -85,10 +61,10 @@ static inline void draw_origin_to_target_scaled(drawbuffer_t* origin_db, drawbuf
 	// copy from origin (at origin offset) to target(at target offset, scaled so that every pixel now is scale pixels wide in the target)
 	for (cy = 0; cy < h; cy++) {
 		for (cx = 0; cx < w; cx++) {
-			p = ldb_get_px(origin_db, cx+origin_x, cy+origin_y);
+			p = db_get_px(origin_db, cx+origin_x, cy+origin_y);
 			for (sy = 0; sy < scale_y; sy++) {
 				for (sx = 0; sx < scale_x; sx++) {
-					ldb_set_px(target_db, cx*scale_x+sx+target_x, cy*scale_y+sy+target_y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+					db_set_px(target_db, cx*scale_x+sx+target_x, cy*scale_y+sy+target_y, p);
 				}
 			}
 		}
@@ -102,9 +78,9 @@ static inline void draw_origin_to_target_ignorealpha(drawbuffer_t* origin_db, dr
 	// copy from origin (at origin offset) to target(at target offset), don't copy pixels from origin if a=0
 	for (cy = 0; cy < h; cy++) {
 		for (cx = 0; cx < w; cx++) {
-			p = ldb_get_px(origin_db, cx+origin_x,cy+origin_y);
+			p = db_get_px(origin_db, cx+origin_x,cy+origin_y);
 			if (p&0xff) {
-				ldb_set_px(target_db, cx+target_x, cy+target_y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+				db_set_px(target_db, cx+target_x, cy+target_y, p);
 			}
 		}
 	}
@@ -117,11 +93,11 @@ static inline void draw_origin_to_target_ignorealpha_scaled(drawbuffer_t* origin
 	// copy from origin (at origin offset) to target(at target offset, scaled), don't copy pixels from origin if a=0
 	for (cy = 0; cy < h; cy++) {
 		for (cx = 0; cx < w; cx++) {
-			p = ldb_get_px(origin_db, cx+origin_x,cy+origin_y);
+			p = db_get_px(origin_db, cx+origin_x,cy+origin_y);
 			if (p&0xff) {
 				for (sy = 0; sy < scale_y; sy++) {
 					for (sx = 0; sx < scale_x; sx++) {
-						ldb_set_px(target_db, cx*scale_x+sx+target_x, cy*scale_y+sy+target_y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+						db_set_px(target_db, cx*scale_x+sx+target_x, cy*scale_y+sy+target_y, p);
 					}
 				}
 			}
@@ -136,10 +112,10 @@ static inline void draw_origin_to_target_alphablend(drawbuffer_t* origin_db, dra
 	// copy from origin (at origin offset) to target(at target offset), alphablend pixels(allows for semi-transparency)
 	for (cy=0; cy < h; cy++) {
 		for (cx=0; cx < w; cx++) {
-			sp = ldb_get_px(origin_db, cx+origin_x,cy+origin_y);
-			tp = ldb_get_px(target_db, cx+target_x, cy+target_y);
+			sp = db_get_px(origin_db, cx+origin_x,cy+origin_y);
+			tp = db_get_px(target_db, cx+target_x, cy+target_y);
 			p = alphablend(tp, sp);
-			ldb_set_px(target_db, cx+target_x, cy+target_y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+			db_set_px(target_db, cx+target_x, cy+target_y, p);
 		}
 	}
 }
@@ -147,16 +123,15 @@ static inline void draw_origin_to_target_alphablend(drawbuffer_t* origin_db, dra
 
 
 static inline void floyd_steinberg_increment_pixel(drawbuffer_t* db, int x, int y, uint8_t w, uint8_t r_err, uint8_t g_err, uint8_t b_err) {
-	uint32_t tp = ldb_get_px(db, x, y);
-	uint32_t t_r = (tp&0xff000000)>>24;
-	uint32_t t_g = (tp&0x00ff0000)>>16;
-	uint32_t t_b = (tp&0x0000ff00)>>8;
+	uint32_t p = db_get_px(db, x, y);
+	uint32_t r, g, b;
+	UNPACK_RGB(p,r,g,b)
 
-	t_r = t_r + ((r_err*w)>>4);
-	t_g = t_g + ((g_err*w)>>4);
-	t_b = t_b + ((b_err*w)>>4);
+	r += (r_err*w)>>4;
+	g += (g_err*w)>>4;
+	b += (b_err*w)>>4;
 
-	ldb_set_px(db, x, y, t_r>255?255:t_r,t_g>255?255:t_g,t_b>255?255:t_b, tp&0xff);
+	db_set_px_rgba(db, x, y, r>255?255:r, g>255?255:g, b>255?255:b, p&0xff);
 }
 
 static inline void floyd_steinberg_16bpp_rgb565(drawbuffer_t* db) {
@@ -167,11 +142,9 @@ static inline void floyd_steinberg_16bpp_rgb565(drawbuffer_t* db) {
 
 	for (cy=0; cy < db->h; cy++) {
 		for (cx=0; cx < db->w; cx++) {
-			tp = ldb_get_px(db, cx,cy);
-			r = (tp&0xff000000)>>24;
-			g = (tp&0x00ff0000)>>16;
-			b = (tp&0x0000ff00)>>8;
-			ldb_set_px(db, cx,cy, r&0xf8,g&0xfc,b&0xf8, tp&0xff);
+			tp = db_get_px(db, cx,cy);
+			UNPACK_RGB(tp,r,g,b)
+			db_set_px_rgba(db, cx,cy, r&0xf8,g&0xfc,b&0xf8, tp&0xff);
 			r_err = r&0x07;
 			g_err = g&0x03;
 			b_err = b&0x07;
@@ -191,11 +164,9 @@ static inline void floyd_steinberg_8bpp_rgb332(drawbuffer_t* db) {
 
 	for (cy=0; cy < db->h; cy++) {
 		for (cx=0; cx < db->w; cx++) {
-			tp = ldb_get_px(db, cx,cy);
-			r = (tp&0xff000000)>>24;
-			g = (tp&0x00ff0000)>>16;
-			b = (tp&0x0000ff00)>>8;
-			ldb_set_px(db, cx,cy, r&0xe0,g&0xe0,b&0xc0, tp&0xff);
+			tp = db_get_px(db, cx,cy);
+			UNPACK_RGB(tp,r,g,b)
+			db_set_px_rgba(db, cx,cy, r&0xe0,g&0xe0,b&0xc0, tp&0xff);
 			r_err = r&0x1f;
 			g_err = g&0x1f;
 			b_err = b&0x3f;
@@ -215,11 +186,9 @@ static inline void floyd_steinberg_1bpp_r(drawbuffer_t* db) {
 
 	for (cy=0; cy < db->h; cy++) {
 		for (cx=0; cx < db->w; cx++) {
-			tp = ldb_get_px(db, cx,cy);
-			r = (tp&0xff000000)>>24;
-			g = (tp&0x00ff0000)>>16;
-			b = (tp&0x0000ff00)>>8;
-			ldb_set_px(db, cx,cy, r&0x80,g&0x80,b&0x80, tp&0xff);
+			tp = db_get_px(db, cx,cy);
+			UNPACK_RGB(tp,r,g,b)
+			db_set_px_rgba(db, cx,cy, r&0x80,g&0x80,b&0x80, tp&0xff);
 			r_err = r&0x7f;
 			g_err = g&0x7f;
 			b_err = b&0x7f;
@@ -245,7 +214,7 @@ static inline void line(drawbuffer_t* db, int x0, int y0, int x1, int y1, uint8_
 	err = (dx>dy ? dx : -dy)/2;
 
 	while(1) {
-		ldb_set_px(db, x0,y0,r,g,b,a);
+		db_set_px_rgba(db, x0,y0,r,g,b,a);
 		if (x0==x1 && y0==y1) {
 			break;
 		}
@@ -275,9 +244,9 @@ static inline void line_alphablend(drawbuffer_t* db, int x0, int y0, int x1, int
 	err = (dx>dy ? dx : -dy)/2;
 
 	while(1) {
-		sp = ldb_get_px(db, x0, y0);
+		sp = db_get_px(db, x0, y0);
 		p = alphablend(sp, tp);
-		ldb_set_px(db, x0, y0, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+		db_set_px(db, x0, y0, p);
 		if (x0==x1 && y0==y1) {
 			break;
 		}
@@ -315,9 +284,9 @@ static inline void line_anti_aliased(drawbuffer_t* db, float x0, float y0, float
 		for (cx = x_min; cx <= x_max; cx++) {
 			alpha = fmaxf(fminf(0.5f - capsuleSDF(cx, cy, x0, y0, x1, y1, radius), 1.0f), 0.0f)*(float)a;
 			if (alpha>0) {
-				sp = ldb_get_px(db, cx, cy);
+				sp = db_get_px(db, cx, cy);
 				p = alphablend(sp, tp | ((uint32_t)alpha));
-				ldb_set_px(db, cx, cy, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+				db_set_px(db, cx, cy, p);
 			}
 		}
 	}
@@ -329,7 +298,7 @@ static inline void rectangle_fill(drawbuffer_t* db, int x, int y, int w, int h, 
 	int cx, cy;
 	for (cy = y; cy < y+h; cy++) {
 		for (cx = x; cx < x+w; cx++) {
-			ldb_set_px(db, cx, cy, r,g,b,a);
+			db_set_px_rgba(db, cx, cy, r,g,b,a);
 		}
 	}
 }
@@ -337,12 +306,12 @@ static inline void rectangle_fill(drawbuffer_t* db, int x, int y, int w, int h, 
 static inline void rectangle_outline(drawbuffer_t* db, int x, int y, int w, int h, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
 	int cx, cy;
 	for (cx = x; cx < x+w; cx++) {
-		ldb_set_px(db, cx, y, r,g,b,a);
-		ldb_set_px(db, cx, y+(h-1), r,g,b,a);
+		db_set_px_rgba(db, cx, y, r,g,b,a);
+		db_set_px_rgba(db, cx, y+(h-1), r,g,b,a);
 	}
 	for (cy = y+1; cy < y+h-1; cy++) {
-		ldb_set_px(db, x, cy, r,g,b,a);
-		ldb_set_px(db, x+(w-1), cy, r,g,b,a);
+		db_set_px_rgba(db, x, cy, r,g,b,a);
+		db_set_px_rgba(db, x+(w-1), cy, r,g,b,a);
 	}
 }
 
@@ -353,9 +322,9 @@ static inline void rectangle_fill_alphablend(drawbuffer_t* db, int x, int y, int
 
 	for (cy = y; cy < y+h; cy++) {
 		for (cx = x; cx < x+w; cx++) {
-			sp = ldb_get_px(db, cx, cy);
+			sp = db_get_px(db, cx, cy);
 			p = alphablend(sp, tp);
-			ldb_set_px(db, cx, cy, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+			db_set_px(db, cx, cy, p);
 		}
 	}
 }
@@ -366,16 +335,16 @@ static inline void rectangle_outline_alphablend(drawbuffer_t* db, int x, int y, 
 	uint32_t tp = ((uint32_t)r<<24) | ((uint32_t)g<<16) | ((uint32_t)b<<8) | (uint32_t)a;
 
 	for (cx = x; cx < x+w; cx++) {
-		p = alphablend(ldb_get_px(db, cx, y), tp);
-		ldb_set_px(db, cx, y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
-		p = alphablend(ldb_get_px(db, cx, y+(h-1)), tp);
-		ldb_set_px(db, cx, y+(h-1), (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+		p = alphablend(db_get_px(db, cx, y), tp);
+		db_set_px(db, cx, y, p);
+		p = alphablend(db_get_px(db, cx, y+(h-1)), tp);
+		db_set_px(db, cx, y+(h-1), p);
 	}
 	for (cy = y+1; cy < y+h-1; cy++) {
-		p = alphablend(ldb_get_px(db, x, cy), tp);
-		ldb_set_px(db, x, cy, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
-		p = alphablend(ldb_get_px(db, x+(w-1), cy), tp);
-		ldb_set_px(db, x+(w-1), cy, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+		p = alphablend(db_get_px(db, x, cy), tp);
+		db_set_px(db, x, cy, p);
+		p = alphablend(db_get_px(db, x+(w-1), cy), tp);
+		db_set_px(db, x+(w-1), cy, p);
 	}
 }
 
@@ -385,7 +354,7 @@ static inline void set_vline(drawbuffer_t* db, int y, float x0, float x1, uint32
 	int cx;
 
 	for (cx= (x0 < x1 ? x0 : x1); cx<=(x0 > x1 ? x0 : x1); cx++) {
-		ldb_set_px(db, cx, y, (tp&0xFF000000)>>24, (tp&0x00FF0000)>>16, (tp&0x0000FF00)>>8, tp&0xFF);
+		db_set_px(db, cx, y, tp);
 	}
 }
 
@@ -394,8 +363,8 @@ static inline void set_vline_alphablend(drawbuffer_t* db, int y, float x0, float
 	uint32_t p;
 
 	for (cx= (x0 < x1 ? x0 : x1); cx<=(x0 > x1 ? x0 : x1); cx++) {
-		p = alphablend(ldb_get_px(db, cx, y), tp);
-		ldb_set_px(db, cx, y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+		p = alphablend(db_get_px(db, cx, y), tp);
+		db_set_px(db, cx, y, p);
 	}
 }
 
@@ -527,9 +496,9 @@ static inline void circle_fill_aliased(drawbuffer_t* db, float center_x, float c
 			}
 			alpha = fmaxf(fminf(0.5f - d, 1.0f), 0.0f)*(float)a;
 			if (alpha>0) {
-				sp = ldb_get_px(db, cx, cy);
+				sp = db_get_px(db, cx, cy);
 				p = alphablend(sp, tp | ((uint32_t)alpha));
-				ldb_set_px(db, cx, cy, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+				db_set_px(db, cx, cy, p);
 			}
 		}
 	}
@@ -544,20 +513,20 @@ static inline void circle_fill(drawbuffer_t* db, int x, int y, int radius, uint8
     	tx = (i % rr) - radius;
     	ty = (i / rr) - radius;
     	if (tx * tx + ty * ty <= r2) {
-        	ldb_set_px(db, x + tx, y + ty, r,g,b,a);
+        	db_set_px_rgba(db, x + tx, y + ty, r,g,b,a);
 		}
 	}
 }
 
 static inline void circle_set8(drawbuffer_t* db, int x, int y, int cx, int cy, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
-	ldb_set_px(db, x+cx, y+cy, r,g,b,a);
-    ldb_set_px(db, x-cx, y+cy, r,g,b,a);
-    ldb_set_px(db, x+cx, y-cy, r,g,b,a);
-    ldb_set_px(db, x-cx, y-cy, r,g,b,a);
-    ldb_set_px(db, x+cy, y+cx, r,g,b,a);
-    ldb_set_px(db, x-cy, y+cx, r,g,b,a);
-    ldb_set_px(db, x+cy, y-cx, r,g,b,a);
-    ldb_set_px(db, x-cy, y-cx, r,g,b,a);
+	db_set_px_rgba(db, x+cx, y+cy, r,g,b,a);
+    db_set_px_rgba(db, x-cx, y+cy, r,g,b,a);
+    db_set_px_rgba(db, x+cx, y-cy, r,g,b,a);
+    db_set_px_rgba(db, x-cx, y-cy, r,g,b,a);
+    db_set_px_rgba(db, x+cy, y+cx, r,g,b,a);
+    db_set_px_rgba(db, x-cy, y+cx, r,g,b,a);
+    db_set_px_rgba(db, x+cy, y-cx, r,g,b,a);
+    db_set_px_rgba(db, x-cy, y-cx, r,g,b,a);
 }
 
 static inline void circle_outline(drawbuffer_t* db, int x, int y, int radius, uint8_t r, uint8_t g, uint8_t b, uint8_t a) {
@@ -666,6 +635,7 @@ static int lua_gfx_origin_to_target(lua_State *L) {
 	int w = lua_tointeger(L, 7);
 	int h = lua_tointeger(L, 8);
 
+	// TODO: Allow non-integer scale using bilinear interpolation
 	int scale_x = lua_tointeger(L, 9);
 	int scale_y = lua_tointeger(L, 10);
 
@@ -752,7 +722,7 @@ static int lua_gfx_pixel_function(lua_State *L) {
 
 	for (cy = 0; cy < db->h; cy++) {
 		for (cx = 0; cx < db->w; cx++) {
-			uint32_t p = ldb_get_px(db, cx,cy);
+			uint32_t p = db_get_px(db, cx,cy);
 
 			// duplicate function reference
 			lua_pushvalue(L, 2);
@@ -793,7 +763,7 @@ static int lua_gfx_pixel_function(lua_State *L) {
 			lua_pop(L, 4);
 
 			// Write back to drawbuffer
-			ldb_set_px(db, cx,cy,r,g,b,a);
+			db_set_px_rgba(db, cx,cy,r,g,b,a);
 		}
 	}
 
@@ -976,8 +946,8 @@ static int lua_gfx_set_px_alphablend(lua_State *L) {
 	}
 
 	uint32_t tp = ((uint32_t)r)<<24 | ((uint32_t)g)<<16 | ((uint32_t)b)<<8 | a;
-	uint32_t p = alphablend(ldb_get_px(db, x, y), tp);
-	ldb_set_px(db, x, y, (p&0xFF000000)>>24, (p&0x00FF0000)>>16, (p&0x0000FF00)>>8, p&0xFF);
+	uint32_t p = alphablend(db_get_px(db, x, y), tp);
+	db_set_px(db, x, y, p);
 
 	return 0;
 }
