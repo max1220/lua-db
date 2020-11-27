@@ -21,8 +21,8 @@
 // get the cannoncial string representing the pixel format
 static const char* pixel_format_to_str(PIX_FMT fmt) {
 	switch(fmt) {
-		case LDB_PXFMT_1BPP_R: return "r1";
-		case LDB_PXFMT_8BPP_R: return "r8";
+		case LDB_PXFMT_1BPP: return "bit";
+		case LDB_PXFMT_8BPP: return "byte";
 		case LDB_PXFMT_8BPP_RGB332: return "rgb332";
 		case LDB_PXFMT_16BPP_RGB565: return "rgb565";
 		case LDB_PXFMT_16BPP_BGR565: return "bgr565";
@@ -38,18 +38,17 @@ static const char* pixel_format_to_str(PIX_FMT fmt) {
 
 // get the pixel format number from a pixel format string
 static PIX_FMT str_to_pixel_format(const char* str) {
-	if (strcmp(str, "r1")) { return LDB_PXFMT_1BPP_R; }
-	else if (strcmp(str, "r1")) { return LDB_PXFMT_1BPP_R; }
-	else if (strcmp(str, "r8")) { return LDB_PXFMT_8BPP_R; }
-	else if (strcmp(str, "rgb332")) { return LDB_PXFMT_8BPP_RGB332; }
-	else if (strcmp(str, "rgb565")) { return LDB_PXFMT_16BPP_RGB565; }
-	else if (strcmp(str, "bgr565")) { return LDB_PXFMT_16BPP_BGR565; }
-	else if (strcmp(str, "rgb888")) { return LDB_PXFMT_24BPP_RGB; }
-	else if (strcmp(str, "bgr888")) { return LDB_PXFMT_24BPP_BGR; }
-	else if (strcmp(str, "rgba8888")) { return LDB_PXFMT_32BPP_RGBA; }
-	else if (strcmp(str, "argb8888")) { return LDB_PXFMT_32BPP_ARGB; }
-	else if (strcmp(str, "abgr8888")) { return LDB_PXFMT_32BPP_ABGR; }
-	else if (strcmp(str, "bgra8888")) { return LDB_PXFMT_32BPP_BGRA; }
+	if (strcmp(str, "bit")==0) { return LDB_PXFMT_1BPP; }
+	else if (strcmp(str, "byte")==0) { return LDB_PXFMT_8BPP; }
+	else if (strcmp(str, "rgb332")==0) { return LDB_PXFMT_8BPP_RGB332; }
+	else if (strcmp(str, "rgb565")==0) { return LDB_PXFMT_16BPP_RGB565; }
+	else if (strcmp(str, "bgr565")==0) { return LDB_PXFMT_16BPP_BGR565; }
+	else if (strcmp(str, "rgb888")==0) { return LDB_PXFMT_24BPP_RGB; }
+	else if (strcmp(str, "bgr888")==0) { return LDB_PXFMT_24BPP_BGR; }
+	else if (strcmp(str, "rgba8888")==0) { return LDB_PXFMT_32BPP_RGBA; }
+	else if (strcmp(str, "argb8888")==0) { return LDB_PXFMT_32BPP_ARGB; }
+	else if (strcmp(str, "abgr8888")==0) { return LDB_PXFMT_32BPP_ABGR; }
+	else if (strcmp(str, "bgra8888")==0) { return LDB_PXFMT_32BPP_BGRA; }
 	return LDB_PXFMT_MAX;
 }
 
@@ -68,10 +67,10 @@ static int lua_drawbuffer_tostring(lua_State *L) {
 	}
 
 	switch (db->pxfmt) {
-		case LDB_PXFMT_1BPP_R:
+		case LDB_PXFMT_1BPP:
 			lua_pushfstring(L, "1bpp Drawbuffer: %dx%d", db->w, db->h);
 			return 1;
-		case LDB_PXFMT_8BPP_R:
+		case LDB_PXFMT_8BPP:
 			lua_pushfstring(L, "8bpp Drawbuffer: %dx%d", db->w, db->h);
 			return 1;
 		case LDB_PXFMT_8BPP_RGB332:
@@ -149,7 +148,9 @@ static int lua_drawbuffer_close(lua_State *L) {
 	drawbuffer_t *db;
  	LUA_LDB_CHECK_DB(L, 1, db)
 
-	if (db->data) {
+	if (db->close_func) {
+		db->close_func(db);
+	} else if (db->data) {
 		free(db->data);
 		db->data = NULL;
 	}
@@ -265,6 +266,33 @@ static int lua_drawbuffer_load_data(lua_State *L) {
 }
 
 
+void lua_set_ldb_meta(lua_State *L, int i) {
+	// push/create metatable for userdata.
+	// The same metatable is used for every drawbuffer instance.
+	if (luaL_newmetatable(L, LDB_UDATA_NAME)) {
+		lua_pushstring(L, "__index");
+		lua_newtable(L);
+		LUA_T_PUSH_S_CF("width", lua_drawbuffer_width)
+		LUA_T_PUSH_S_CF("height", lua_drawbuffer_height)
+		LUA_T_PUSH_S_CF("bytes_len", lua_drawbuffer_bytelen)
+		LUA_T_PUSH_S_CF("pixel_format", lua_drawbuffer_pixel_format)
+		LUA_T_PUSH_S_CF("get_px", lua_drawbuffer_get_px)
+		LUA_T_PUSH_S_CF("set_px", lua_drawbuffer_set_px)
+		LUA_T_PUSH_S_CF("clear", lua_drawbuffer_clear)
+		LUA_T_PUSH_S_CF("dump_data", lua_drawbuffer_dump_data)
+		LUA_T_PUSH_S_CF("load_data", lua_drawbuffer_load_data)
+		LUA_T_PUSH_S_CF("close", lua_drawbuffer_close)
+		LUA_T_PUSH_S_CF("tostring", lua_drawbuffer_tostring)
+		lua_settable(L, -3);
+
+		LUA_T_PUSH_S_CF("__gc", lua_drawbuffer_close)
+		LUA_T_PUSH_S_CF("__tostring", lua_drawbuffer_tostring)
+	}
+
+	// apply metatable to userdata
+	lua_setmetatable(L, i);
+}
+
 
 // create a new drawbuffer userdata object
 static int lua_new_drawbuffer(lua_State *L) {
@@ -290,8 +318,10 @@ static int lua_new_drawbuffer(lua_State *L) {
 	if (lua_isstring(L, 3)) {
 		const char* fmt_str = lua_tostring(L, 3);
 		fmt = str_to_pixel_format(fmt_str);
+	} else if (lua_isnumber(L, 3)) {
+		fmt = lua_tonumber(L, 3);
 	}
-	if (fmt >= LDB_PXFMT_MAX) {
+	if ((fmt >= LDB_PXFMT_MAX) || (fmt<0)) {
 		lua_pushnil(L);
 		lua_pushstring(L, "Unknown format!");
 		return 2;
@@ -317,30 +347,11 @@ static int lua_new_drawbuffer(lua_State *L) {
 	db->w = w;
 	db->h = h;
 	db->pxfmt = fmt;
+	db->close_func = NULL;
+	db->close_data = NULL;
 
-	// push/create metatable for userdata. The same metatable is used for every drawbuffer instance.
-	if (luaL_newmetatable(L, LDB_UDATA_NAME)) {
-		lua_pushstring(L, "__index");
-		lua_newtable(L);
-		LUA_T_PUSH_S_CF("width", lua_drawbuffer_width)
-		LUA_T_PUSH_S_CF("height", lua_drawbuffer_height)
-		LUA_T_PUSH_S_CF("bytes_len", lua_drawbuffer_bytelen)
-		LUA_T_PUSH_S_CF("pixel_format", lua_drawbuffer_pixel_format)
-		LUA_T_PUSH_S_CF("get_px", lua_drawbuffer_get_px)
-		LUA_T_PUSH_S_CF("set_px", lua_drawbuffer_set_px)
-		LUA_T_PUSH_S_CF("clear", lua_drawbuffer_clear)
-		LUA_T_PUSH_S_CF("dump_data", lua_drawbuffer_dump_data)
-		LUA_T_PUSH_S_CF("load_data", lua_drawbuffer_load_data)
-		LUA_T_PUSH_S_CF("close", lua_drawbuffer_close)
-		LUA_T_PUSH_S_CF("tostring", lua_drawbuffer_tostring)
-		lua_settable(L, -3);
-
-		LUA_T_PUSH_S_CF("__gc", lua_drawbuffer_close)
-		LUA_T_PUSH_S_CF("__tostring", lua_drawbuffer_tostring)
-	}
-
-	// apply metatable to userdata
-	lua_setmetatable(L, -2);
+	// Apply drawbuffer metatable to userdata object
+	lua_set_ldb_meta(L, -2);
 
 	// return userdata
 	return 1;
