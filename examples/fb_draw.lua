@@ -4,15 +4,14 @@ local ldb_core = require("ldb_core")
 local ldb_gfx = require("ldb_gfx")
 local ldb_bitmap = require("lua-db.bitmap")
 local ldb_bmpfont = require("lua-db.bmpfont")
-local ldb_drm = require("ldb_drm")
+local ldb_fb = require("ldb_fb")
 
 local function gettime()
 	return require("time").monotonic()
 	--return os.time()
 end
 
-local card = ldb_drm.new_card("/dev/dri/card0")
-card:prepare()
+local fb = ldb_fb.new_framebuffer("/dev/fb0")
 
 local font_db = ldb_bitmap.decode_from_file_drawbuffer("./examples/data/8x8_font_max1220_white.bmp")
 local font = ldb_bmpfont.new_bmpfont({
@@ -25,16 +24,12 @@ local font = ldb_bmpfont.new_bmpfont({
 	color = {255,255,255}
 })
 
-local info = card:get_info()
-local drawbuffers = {}
-for k,entry in ipairs(info) do
-	local w,h = entry.width, entry.height
-	print(("Preparing monitor %d for resolution %dx%d"):format(k,w,h))
-	--local db = ldb_core.new_drawbuffer(w,h)
-	local db = card:get_drawbuffer(k)
-	drawbuffers[k] = db
-end
-print(("Prepared %d drawbuffers for output"):format(#drawbuffers))
+
+local vinfo = fb:get_varinfo()
+local w,h = vinfo.xres, vinfo.yres
+local drawbuffer = fb:get_drawbuffer()
+drawbuffer:clear(0,0,0,0)
+print("Prepared drawbuffers for output", drawbuffer)
 
 local start = gettime()
 local iter = 0
@@ -42,14 +37,11 @@ local now = start
 local last = now
 while now-start < 15 do
 	local dt = now-last
-	-- draw a different output to all outputs
-	for i,db in ipairs(drawbuffers) do
-		local running = now-start
-		db:clear(ldb_gfx.hsv_to_rgb(((i/(#drawbuffers+1))+running*0.33)%1, 0.7, 0.7))
-		font:draw_text(db, ("DRM output: %d"):format(i), 16, 16)
-		font:draw_text(db, ("FPS: %7.2f"):format(1/dt), 16, 32)
-		font:draw_text(db, ("Current time: %7.2f"):format(running), 16, 48)
-	end
+	local running = now-start
+	drawbuffer:clear(ldb_gfx.hsv_to_rgb((running*0.33)%1, 1, 1))
+	font:draw_text(drawbuffer, ("Framebuffer: %s"):format(tostring(fb)), 16, 16)
+	font:draw_text(drawbuffer, ("FPS: %7.2f"):format(1/dt), 16, 32)
+	font:draw_text(drawbuffer, ("Current time: %7.2f"):format(running), 16, 48)
 	iter = iter + 1
 	last = now
 	now = gettime()
@@ -58,4 +50,4 @@ end
 local elapsed = gettime()-start
 print(("%d iterations in %d seconds. (avg. FPS: %d)"):format(iter, elapsed, iter/elapsed))
 print("Bye!")
-card:close()
+fb:close()
