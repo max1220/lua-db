@@ -55,7 +55,6 @@ static int lua_sdl2fb_close(lua_State *L) {
     return 0;
 }
 
-
 static int lua_sdl2fb_pool_event(lua_State *L) {
 
 	sdl2fb_t *sdl2fb;
@@ -232,6 +231,53 @@ static int lua_sdl2fb_draw_from_drawbuffer(lua_State *L) {
 
 }
 
+void sdl2db_close_func(void* data) {
+	drawbuffer_t *db = (drawbuffer_t*)data;
+	sdl2fb_t *sdl2fb = db->close_data;
+
+	SDL_Window *window = sdl2fb->window;
+	if (window) {
+		//SDL_DestroyRenderer(sdl2fb->renderer);
+		SDL_DestroyWindow(window);
+		SDL_Quit();
+		sdl2fb->window = NULL;
+		//sdl2fb->renderer = NULL;
+		db->data = NULL;
+	}
+}
+
+static int lua_sdl2fb_get_drawbuffer(lua_State *L) {
+	sdl2fb_t *sdl2fb;
+	CHECK_SDL2FB(L, 1, sdl2fb)
+
+	// Create new drawbuffer userdata object
+	drawbuffer_t *db = (drawbuffer_t *)lua_newuserdata(L, sizeof(drawbuffer_t));
+
+	db->w = sdl2fb->w;
+	db->h = sdl2fb->h;
+
+	// TODO: Check pixel format and pitch from SDL surface for compabillity, maybe suppoprt all pixel formats supported by ldb.
+	db->pxfmt = LDB_PXFMT_32BPP_BGRA;
+	db->data = sdl2fb->screen->pixels;
+	db->close_func = &sdl2db_close_func;
+	db->close_data = sdl2fb;
+
+	// apply the drawbuffer metatable to it
+	lua_set_ldb_meta(L, -2);
+
+	// return created drawbuffer
+	return 1;
+}
+
+static int lua_sdl2fb_update_drawbuffer(lua_State *L) {
+	sdl2fb_t *sdl2fb;
+	CHECK_SDL2FB(L, 1, sdl2fb)
+
+	SDL_Window *window = sdl2fb->window;
+	SDL_UpdateWindowSurface(window);
+
+	return 0;
+}
 
 static int lua_sdl_new_sdl2fb(lua_State *L) {
     int w = lua_tointeger(L, 1);
@@ -250,24 +296,45 @@ static int lua_sdl_new_sdl2fb(lua_State *L) {
 
 	SDL_Window *window;
 	SDL_Surface *screen;
+	//SDL_Renderer *renderer;
+	//SDL_Texture *texture;
 
 	SDL_Init(SDL_INIT_VIDEO);
+	//SDL_Init(SDL_INIT_EVERYTHING);
 	window = SDL_CreateWindow(title,0, 0, w, h, 0);
-	screen = SDL_GetWindowSurface(window);
-
 	if (!window) {
 		lua_pushnil(L);
-		lua_pushstring(L, "Can't open SDL2 window!");
+		lua_pushstring(L, "Can't create SDL2 window!");
 		return 2;
 	}
+	screen = SDL_GetWindowSurface(window);
 	if (!screen) {
 		lua_pushnil(L);
-		lua_pushstring(L, "Can't open SDL2 screen!");
+		lua_pushstring(L, "Can't get SDL2 screen!");
 		return 2;
 	}
+
+	/*
+	renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED );
+	if (!renderer) {
+		lua_pushnil(L);
+		lua_pushstring(L, "Can't create SDL2 renderer!");
+		return 2;
+	}
+	texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+	if (!renderer) {
+		lua_pushnil(L);
+		lua_pushstring(L, "Can't create SDL2 texture!");
+		return 2;
+	}
+	*/
+
+
 
 	sdl2fb->window = window;
 	sdl2fb->screen = screen;
+	//sdl2fb->renderer = renderer;
+	//sdl2fb->texture = texture;
 	sdl2fb->w = w;
 	sdl2fb->h = h;
 
@@ -278,6 +345,8 @@ static int lua_sdl_new_sdl2fb(lua_State *L) {
 		LUA_T_PUSH_S_CF("draw_from_drawbuffer", lua_sdl2fb_draw_from_drawbuffer)
 		LUA_T_PUSH_S_CF("pool_event", lua_sdl2fb_pool_event)
 		LUA_T_PUSH_S_CF("set_mouse_grab", lua_sdl2fb_set_mouse_grab)
+		LUA_T_PUSH_S_CF("get_drawbuffer", lua_sdl2fb_get_drawbuffer)
+		LUA_T_PUSH_S_CF("update_drawbuffer", lua_sdl2fb_update_drawbuffer)
 		LUA_T_PUSH_S_CF("close", lua_sdl2fb_close)
 		LUA_T_PUSH_S_CF("tostring", lua_sdl2fb_tostring)
 		lua_settable(L, -3);

@@ -9,6 +9,8 @@
 typedef struct {
     SDL_Window *window;
 	SDL_Surface *screen;
+	//SDL_Renderer *renderer;
+	//SDL_Texture *texture;
 	uint16_t w;
 	uint16_t h;
 } sdl2fb_t;

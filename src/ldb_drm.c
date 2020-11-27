@@ -48,7 +48,7 @@ static struct modeset_dev *modeset_list = NULL;
 
 static int modeset_find_crtc(int fd, drmModeRes *res, drmModeConnector *conn, struct modeset_dev *dev) {
 	drmModeEncoder *enc;
-	unsigned int i, j;
+	int i, j;
 	int32_t crtc;
 	struct modeset_dev *iter;
 
@@ -62,7 +62,7 @@ static int modeset_find_crtc(int fd, drmModeRes *res, drmModeConnector *conn, st
 		if (enc->crtc_id) {
 			crtc = enc->crtc_id;
 			for (iter = modeset_list; iter; iter = iter->next) {
-				if (iter->crtc == crtc) {
+				if (iter->crtc == (uint32_t)crtc) {
 					crtc = -1;
 					break;
 				}
@@ -85,7 +85,8 @@ static int modeset_find_crtc(int fd, drmModeRes *res, drmModeConnector *conn, st
 	for (i = 0; i < conn->count_encoders; ++i) {
 		enc = drmModeGetEncoder(fd, conn->encoders[i]);
 		if (!enc) {
-			fprintf(stderr, "cannot retrieve encoder %u:%u (%d): %m\n", i, conn->encoders[i], errno);
+			//fprintf(stderr, "cannot retrieve encoder %u:%u (%d): %m\n", i, conn->encoders[i], errno);
+			fprintf(stderr, "cannot retrieve encoder %u:%u (%d)\n", i, conn->encoders[i], errno);
 			continue;
 		}
 
@@ -98,7 +99,7 @@ static int modeset_find_crtc(int fd, drmModeRes *res, drmModeConnector *conn, st
 			/* check that no other device already uses this CRTC */
 			crtc = res->crtcs[j];
 			for (iter = modeset_list; iter; iter = iter->next) {
-				if (iter->crtc == crtc) {
+				if (iter->crtc == (uint32_t)crtc) {
 					crtc = -1;
 					break;
 				}
@@ -132,7 +133,7 @@ static int modeset_create_fb(int fd, struct modeset_dev *dev) {
 	creq.bpp = 32;
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_CREATE_DUMB, &creq);
 	if (ret < 0) {
-		fprintf(stderr, "cannot create dumb buffer (%d): %m\n", errno);
+		fprintf(stderr, "cannot create dumb buffer (%d)\n", errno);
 		return -errno;
 	}
 	dev->stride = creq.pitch;
@@ -142,7 +143,7 @@ static int modeset_create_fb(int fd, struct modeset_dev *dev) {
 	/* create framebuffer object for the dumb-buffer */
 	ret = drmModeAddFB(fd, dev->width, dev->height, 24, 32, dev->stride, dev->handle, &dev->fb);
 	if (ret) {
-		fprintf(stderr, "cannot create framebuffer (%d): %m\n", errno);
+		fprintf(stderr, "cannot create framebuffer (%d)\n", errno);
 		ret = -errno;
 		goto err_destroy;
 	}
@@ -152,7 +153,7 @@ static int modeset_create_fb(int fd, struct modeset_dev *dev) {
 	mreq.handle = dev->handle;
 	ret = drmIoctl(fd, DRM_IOCTL_MODE_MAP_DUMB, &mreq);
 	if (ret) {
-		fprintf(stderr, "cannot map dumb buffer (%d): %m\n", errno);
+		fprintf(stderr, "cannot map dumb buffer (%d)\n", errno);
 		ret = -errno;
 		goto err_fb;
 	}
@@ -160,7 +161,7 @@ static int modeset_create_fb(int fd, struct modeset_dev *dev) {
 	/* perform actual memory mapping */
 	dev->map = mmap(0, dev->size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mreq.offset);
 	if (dev->map == MAP_FAILED) {
-		fprintf(stderr, "cannot mmap dumb buffer (%d): %m\n", errno);
+		fprintf(stderr, "cannot mmap dumb buffer (%d)\n", errno);
 		ret = -errno;
 		goto err_fb;
 	}
@@ -220,15 +221,15 @@ static int modeset_setup_dev(int fd, drmModeRes *res, drmModeConnector *conn, st
 static int modeset_prepare(int fd) {
 	drmModeRes *res;
 	drmModeConnector *conn;
-	unsigned int i;
+	int i;
 	struct modeset_dev *dev;
 	int ret;
 
 	/* retrieve resources */
 	res = drmModeGetResources(fd);
 	if (!res) {
-		fprintf(stderr, "cannot retrieve DRM resources (%d): %m\n",
-			errno);
+		//fprintf(stderr, "cannot retrieve DRM resources (%d): %m\n", errno);
+		fprintf(stderr, "cannot retrieve DRM resources (%d)\n", errno);
 		return -errno;
 	}
 
@@ -237,8 +238,8 @@ static int modeset_prepare(int fd) {
 		/* get information for each connector */
 		conn = drmModeGetConnector(fd, res->connectors[i]);
 		if (!conn) {
-			fprintf(stderr, "cannot retrieve DRM connector %u:%u (%d): %m\n",
-				i, res->connectors[i], errno);
+			//fprintf(stderr, "cannot retrieve DRM connector %u:%u (%d): %m\n", i, res->connectors[i], errno);
+			fprintf(stderr, "cannot retrieve DRM connector %u:%u (%d)\n", i, res->connectors[i], errno);
 			continue;
 		}
 
@@ -252,8 +253,8 @@ static int modeset_prepare(int fd) {
 		if (ret) {
 			if (ret != -ENOENT) {
 				errno = -ret;
-				fprintf(stderr, "cannot setup device for connector %u:%u (%d): %m\n",
-					i, res->connectors[i], errno);
+				//fprintf(stderr, "cannot setup device for connector %u:%u (%d): %m\n", i, res->connectors[i], errno);
+				fprintf(stderr, "cannot setup device for connector %u:%u (%d)\n", i, res->connectors[i], errno);
 			}
 			free(dev);
 			drmModeFreeConnector(conn);
@@ -308,7 +309,58 @@ static void modeset_cleanup(int fd) {
 }
 
 
+void drm_card_drawbuffer_close(void* data) {
+	drawbuffer_t *db = (drawbuffer_t*)data;
+	drm_t *drm = db->close_data;
 
+	if (drm->fd >= 0) {
+        close(drm->fd);
+        drm->fd = -1;
+    }
+	if (drm->modeset_list) {
+		modeset_cleanup(drm->fd);
+		drm->modeset_list = NULL;
+	}
+}
+
+static int lua_drm_card_get_drawbuffer(lua_State *L) {
+	drm_t *drm;
+	CHECK_DRM(L, 1, drm)
+
+	int list_entry_index = lua_tonumber(L, 2);
+
+	struct modeset_dev *iter = NULL;
+	struct modeset_dev *found = NULL;
+	int i = 1;
+	for (iter = modeset_list; iter; iter = iter->next) {
+		if ((list_entry_index==i) && (iter->size!=get_data_size(iter->width, iter->height, LDB_PXFMT_32BPP_RGBA))) {
+			found = iter;
+			break;
+		}
+		i++;
+	}
+	if (found == NULL) {
+		return 0;
+	}
+
+	// Create new drawbuffer userdata object
+	drawbuffer_t *db = (drawbuffer_t *)lua_newuserdata(L, sizeof(drawbuffer_t));
+
+	db->w = found->width;
+	db->h = found->height;
+
+	// TODO: Check pixel format and pitch from SDL surface for compabillity, maybe suppoprt all pixel formats supported by ldb.
+	db->pxfmt = LDB_PXFMT_32BPP_BGRA;
+	db->data = found->map;
+	db->close_func = &drm_card_drawbuffer_close;
+	db->close_data = drm;
+
+	// apply the drawbuffer metatable to it
+	lua_set_ldb_meta(L, -2);
+
+	// return created drawbuffer
+	return 1;
+}
 
 
 static int lua_drm_card_copy_from_db(lua_State *L) {
@@ -329,13 +381,12 @@ static int lua_drm_card_copy_from_db(lua_State *L) {
 	for (iter = modeset_list; iter; iter = iter->next) {
 		if ((list_entry_index==i) && (db_len == iter->size)) {
 			// TODO: This just assumes same geometry/pixel format
-			fprintf(stderr, "using memcpy\n");
 			memcpy(iter->map, db->data, db_len);
 			lua_pushboolean(L, 1);
 			return 1;
 		} else if (list_entry_index==i) {
-			for (int y = 0; y < iter->height; ++y) {
-				for (int x = 0; x < iter->width; ++x) {
+			for (uint32_t y = 0; y < iter->height; ++y) {
+				for (uint32_t x = 0; x < iter->width; ++x) {
 					sp = get_px(db->data, db->w, x,y, db->pxfmt);
 					UNPACK_RGB(sp, r,g,b)
 					*(uint32_t*)&iter->map[iter->stride * y + x * 4] = (r << 16) | (g << 8) | b;
@@ -510,6 +561,7 @@ static int lua_drm_new_card(lua_State *L) {
 		LUA_T_PUSH_S_CF("prepare", lua_drm_card_prepare)
 		LUA_T_PUSH_S_CF("get_info", lua_drm_card_get_info)
 		LUA_T_PUSH_S_CF("copy_from_db", lua_drm_card_copy_from_db)
+		LUA_T_PUSH_S_CF("get_drawbuffer", lua_drm_card_get_drawbuffer)
 		LUA_T_PUSH_S_CF("close", lua_drm_card_close)
 		LUA_T_PUSH_S_CF("tostring", lua_drm_card_tostring)
 		lua_settable(L, -3);

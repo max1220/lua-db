@@ -95,7 +95,7 @@ static int lua_framebuffer_copy_from_db(lua_State *L) {
 	}
 
 	// TODO: Support drawbuffers with other dimensions
-	if ((db->w != fb->vinfo.xres)  || (db->h != fb->vinfo.yres)) {
+	if ((db->w != (int)fb->vinfo.xres)  || (db->h != (int)fb->vinfo.yres)) {
 		lua_pushnil(L);
 		lua_pushfstring(L, "Drawbuffer must be of dimensions %dx%d", fb->vinfo.xres, fb->vinfo.yres);
 	}
@@ -168,6 +168,51 @@ static int lua_framebuffer_tostring(lua_State *L) {
 }
 
 
+void framebuffer_db_close_func(void* data) {
+	drawbuffer_t *db = (drawbuffer_t*)data;
+	framebuffer_t *fb = db->close_data;
+	if (fb->fd >= 0) {
+        close(fb->fd);
+        fb->fd = -1;
+    }
+	if (fb->fbdev) {
+		free(fb->fbdev);
+		fb->fbdev = NULL;
+	}
+	if (fb->data) {
+		munmap(fb->data, fb->finfo.smem_len);
+		fb->data = NULL;
+	}
+}
+
+static int lua_framebuffer_get_drawbuffer(lua_State *L) {
+	framebuffer_t *fb;
+	CHECK_FRAMEBUFFER(L, 1, fb)
+
+	if (fb->vinfo.bits_per_pixel != 32) {
+		return 0;
+	}
+
+	// Create new drawbuffer userdata object
+	drawbuffer_t *db = (drawbuffer_t *)lua_newuserdata(L, sizeof(drawbuffer_t));
+
+	db->w = fb->vinfo.xres;
+	db->h = fb->vinfo.yres;
+
+	// TODO: Check pixel format
+	db->pxfmt = LDB_PXFMT_32BPP_BGRA;
+	db->data = fb->data;
+	db->close_func = &framebuffer_db_close_func;
+	db->close_data = fb;
+
+	// apply the drawbuffer metatable to it
+	lua_set_ldb_meta(L, -2);
+
+	// return created drawbuffer
+	return 1;
+}
+
+
 
 static int lua_fb_new_framebuffer(lua_State *L) {
 	// get single argument
@@ -221,6 +266,7 @@ static int lua_fb_new_framebuffer(lua_State *L) {
 		LUA_T_PUSH_S_CF("get_fixinfo", lua_framebuffer_get_fixinfo)
 		LUA_T_PUSH_S_CF("get_varinfo", lua_framebuffer_get_varinfo)
 		LUA_T_PUSH_S_CF("copy_from_db", lua_framebuffer_copy_from_db)
+		LUA_T_PUSH_S_CF("get_drawbuffer", lua_framebuffer_get_drawbuffer)
 		LUA_T_PUSH_S_CF("close", lua_framebuffer_close)
 		LUA_T_PUSH_S_CF("tostring", lua_framebuffer_tostring)
 		lua_settable(L, -3);
