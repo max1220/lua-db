@@ -1,5 +1,5 @@
 CFLAGS ?= -g -std=gnu99 -Wall -Wextra -Wpedantic
-#CFLAGS = -O3 -std=gnu99 -Wall -Wextra -Wpedantic -march=native -mtune=native
+#CFLAGS ?= -O3 -std=gnu99 -Wall -Wextra -Wpedantic -march=native -mtune=native
 LIBFLAG ?= -shared -fpic -lm -Wl,--as-needed
 
 # Lua configuration
@@ -19,12 +19,14 @@ DRM_LIBS ?= -ldrm
 #DRM_CFLAGS = $(pkg-config --cflags libdrm)
 #DRM_LIBS = $(pkg-config --libs libdrm)
 
+MODULES ?= core module_fb module_sdl module_gfx module_drm
+
 STRIP ?= strip
 
 
+
 .PHONY: all
-#all: core module_fb module_sdl module_gfx module_drm
-all: core module_fb module_gfx module_drm
+all: $(MODULES)
 
 .PHONY: help
 help:
