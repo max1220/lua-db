@@ -19,14 +19,14 @@ DRM_LIBS ?= -ldrm
 #DRM_CFLAGS = $(pkg-config --cflags libdrm)
 #DRM_LIBS = $(pkg-config --libs libdrm)
 
-MODULES ?= core module_fb module_sdl module_gfx module_drm
+LDB_MODULES ?= core module_fb module_sdl module_gfx module_drm
 
 STRIP ?= strip
 
 
 
 .PHONY: all
-all: $(MODULES)
+all: $(LDB_MODULES)
 
 .PHONY: help
 help:
