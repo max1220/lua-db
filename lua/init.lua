@@ -31,9 +31,6 @@ ldb_core.rgb_to_hsv = ldb_gfx.rgb_to_hsv
 -- load pure-lua modules into namespace
 local lua_modules = {
 	"input_output",
-	"braile",
-	"blocks",
-	"halfblocks",
 	"ffmpeg",
 	"terminal",
 	"bitmap",
