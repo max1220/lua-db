@@ -24,9 +24,9 @@ local input_output = {}
 -- implementing an output driver. The user code should mostly be concerned with
 -- the target_db, and the driver code mostly with the output_db.
 local ldb_core = require("ldb_core")
-local time = require("time")
 
 function input_output.new_base(config)
+	local time = require("time")
 	local base = {}
 
 	-- specifies the drawbuffer target that forwarded to draw callbacks(Internal pixel representation)
@@ -329,6 +329,75 @@ function input_output.new_sdl2fb(config)
 
 	return sdlio
 end
+
+
+function input_output.new_terminal(config)
+	local termio = input_output.new_base(config)
+	local terminal_lib = require("lua-db.terminal")
+	local getch = require("lua-getch")
+
+	-- list of keys(sequences) to handle special.
+	local key_table = {
+		[10] = "enter",
+		[9] = "tab",
+		[127] = "backspace",
+		[27] = {
+			[91] = {
+				[65] = "up",
+				[66] = "down",
+				[67] = "right",
+				[68] = "left"
+			}
+		}
+	}
+
+	-- add key combinations to key_table
+	local exclude = {[3]=true, [9]=true, [10]=true, [13]=true, [17]=true, [19]=true, [26]=true} -- can't get these ctrl-codes via a terminal
+	for i=1, 26 do
+		if not exclude[i] then
+			key_table[i] = "ctrl-"..string.char(i+64)
+		end
+		key_table[27][i+64] = "alt-"..string.char(i+64)
+		key_table[27][i+96] = "alt-"..string.char(i+96)
+	end
+
+	local function write_cb(term, str)
+		io.stderr:write(str)
+	end
+
+	function termio:on_init()
+		self.term = terminal_lib.new_terminal(write_cb, getch.non_blocking, "ansi_3bit", false)
+		-- TODO: figure out terminal based on envirioment variables
+	end
+
+	function termio:handle_key_resolved(resolved)
+
+	end
+
+	function termio:handle_key_code(code)
+		if ((code>=65) and (code<=90)) or ((code>=97) and (code<=122)) then
+			-- it's a letter(a-z, A-Z)
+
+		end
+	end
+
+	function termio:on_event_pool()
+		local key_code, resolved = getch.get_mbs(getch.non_blocking, key_table)
+		if key_code == nil then
+			return -- no new terminal input received
+		end
+		if resolved then -- handle special keys to SDL events
+			self:handle_key_resolved(resolved)
+		else -- handle regular key presses
+			self:handle_key_code(key_code)
+		end
+	end
+
+	function termio:on_output_draw()
+	end
+
+end
+
 
 
 function input_output.new_from_args(config, args)
