@@ -10,8 +10,8 @@
 #define LUA_LDB_CHECK_DB(L, I, D) D=(drawbuffer_t *)luaL_checkudata(L, I, LDB_UDATA_NAME); if ((D==NULL) || (!D->data)) { lua_pushnil(L); lua_pushfstring(L, "Argument %d must be a drawbuffer", I); return 2; }
 
 // "unpack" the internal pixel value to seperate r,g,b,a uint8_t variables.
-#define UNPACK_RGB(P, R, G, B) r = unpack_pixel_r(P); g = unpack_pixel_g(P); b = unpack_pixel_b(P);
-#define UNPACK_RGBA(P, R, G, B, A) r = unpack_pixel_r(P); g = unpack_pixel_g(P); b = unpack_pixel_b(P); a = unpack_pixel_a(P);
+#define UNPACK_RGB(P, R, G, B) R = unpack_pixel_r(P); G = unpack_pixel_g(P); B = unpack_pixel_b(P);
+#define UNPACK_RGBA(P, R, G, B, A) R = unpack_pixel_r(P); G = unpack_pixel_g(P); B = unpack_pixel_b(P); A = unpack_pixel_a(P);
 
 // Copy the pixel bytes A,B,C,D to the data pointer.
 #define SET_DATA2(DATA, X, Y, W, A,B) DATA[(Y*W+X)*2] = A; DATA[(Y*W+X)*2+1] = B;
