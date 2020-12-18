@@ -4,36 +4,50 @@
 
 // Macro to set a pixel with compile-time parameters specifying alpha-blending and scale
 // Keep ALPHA and SX,SY compile-time constant!
-#define SET_PX(ALPHA,SX,SY, DB,X,Y,P) for (int __cy = 0; __cy<SX; __cy++) { for (int __cx = 0; __cx<SY; __cx++) { \
-	if (ALPHA==1) { db_set_px_ignorealpha(DB, X+__cx, Y+__cy, P); } \
-	else if (ALPHA==2) { db_set_px_alphablend(DB, X+__cx, Y+__cy, P); } \
-	else { db_set_px(DB, X+__cx, Y+__cy, P); } } }
+#define SET_PX(ALPHA,SX,SY, DB,X,Y,P) \
+for (int __scy=0; __scy<SY; __scy++) { for (int __scx=0; __scx<SX; __scx++) { \
+	if (ALPHA==1) { db_set_px_ignorealpha(DB, X+__scx, Y+__scy, P); } \
+	else if (ALPHA==2) { db_set_px_alphablend(DB, X+__scx, Y+__scy, P); } \
+	else { db_set_px(DB, X+__scx, Y+__scy, P); } } }
 
 // Macro to copy a rectangular region with compile-time parameters specifying alpha-blending and scale
 // Keep ALPHA and SX,SY compile-time constant!
-#define COPY_RECT(ALPHA,SX,SY, O_DB,T_DB, TX,TY, OX,OY, W,H) for (int __cy = 0; __cy<H; __cy++) { for (int __cx = 0; __cx<W; __cx++) { \
+#define COPY_RECT(ALPHA,SX,SY, O_DB,T_DB, TX,TY, OX,OY, W,H) \
+for (int __cy=0; __cy<H; __cy++) { for (int __cx=0; __cx<W; __cx++) { \
 	uint32_t __p = db_get_px(O_DB, OX+__cx, OY+__cy); \
-	SET_PX(ALPHA, SX,SY, T_DB, TX+__cx,TY+__cy, __p) } }
+	SET_PX(ALPHA, SX,SY, T_DB, (TX+__cx),(TY+__cy), __p) } }
 
 
 // Mix the colors based on the alph value of the target pixel
 static inline uint32_t alphablend(uint32_t sp, uint32_t tp) {
-	if ((tp&0xff)==0) {
-		return sp;
-	} else if ((tp&0xff)==0xff) {
-		return tp;
+	uint8_t s_r,s_g,s_b,s_a; // source pixel
+	uint8_t t_r,t_g,t_b,t_a; // target pixel
+
+	t_a = unpack_pixel_a(tp);
+	if (t_a==0) {
+		return sp; // target alpha=0, keep source pixel unmodified
 	}
+	UNPACK_RGB(tp, t_r,t_g,t_b)
 
-	// blend alpha, e.g. for red: sp.r * (1-tp.a) + tp.r*tp.a
-	uint32_t ret = tp & 0xff;
-	ret |= (uint32_t)((float)((sp&0xff000000)>>24) * (1-((float)(tp&0xff)/255.0)) + (float)((tp&0xff000000)>>24) * ((float)(tp&0xff)/255.0))<<24;
-	ret |= (uint32_t)((float)((sp&0x00ff0000)>>16) * (1-((float)(tp&0xff)/255.0)) + (float)((tp&0x00ff0000)>>16) * ((float)(tp&0xff)/255.0))<<16;
-	ret |= (uint32_t)((float)((sp&0x0000ff00)>>8)  * (1-((float)(tp&0xff)/255.0)) + (float)((tp&0x0000ff00)>>8) * ((float)(tp&0xff)/255.0))<<8;
+	s_a = unpack_pixel_a(sp);
+	if (t_a==0xff) {
+		return pack_pixel_rgba(t_r, t_g, t_b, s_a); // target alpha=1, set to target pixel(but keep alpha of source)
+	}
+	UNPACK_RGB(sp, s_r,s_g,s_b)
 
-	return ret;
+	float alpha = ((float)t_a)/255.0;
+	float ialpha = 1-alpha;
+
+	uint8_t r,g,b,a;
+	r = t_r*alpha + s_r*ialpha;
+	g = t_g*alpha + s_g*ialpha;
+	b = t_b*alpha + s_b*ialpha;
+	a = s_a; // TODO: Is this right?
+
+	return pack_pixel_rgba(r,g,b,a);
 }
 
-// Set a pixel by mixing the color values using alpha-blending
+// Set a pixel by mixing the color values using alpha-blending. Does not modify the alpha channel of the drawbuffer.
 static inline void set_px_alphablend(uint8_t* data, int w, int x, int y, uint32_t p, PIX_FMT fmt) {
 	uint32_t sp = get_px(data, w, x,y, fmt);
 	uint32_t tp = alphablend(sp, p);
