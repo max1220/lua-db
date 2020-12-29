@@ -67,7 +67,7 @@ function test_drawbuffer_load_data()
 		local cline = {}
 		for x=1, drawbuffer:width() do
 			if x==y then
-				cline[#cline+1] = "\255\255\255\255"
+				cline[#cline+1] = "\63\127\255\255"
 			else
 				cline[#cline+1] = "\0\0\0\0"
 			end
@@ -85,7 +85,7 @@ function test_drawbuffer_load_data()
 		local j = i*4+1
 		local r,g,b,a = dump_data:byte(j,j+3)
 		if (x==y) then
-			lu.assertEquals({r,g,b,a}, {255,255,255,255})
+			lu.assertEquals({r,g,b,a}, {63,127,255,255})
 		else
 			lu.assertEquals({r,g,b,a}, {0,0,0,0})
 		end
