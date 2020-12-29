@@ -1,10 +1,11 @@
 #!/bin/bash
 # run from top-level directory(lua-db/)
+callbacks="callback_basic.lua"
 strides="128" # list of strides that are tested
-threads="6" # list of thread counts that are tested
+threads="12" # list of thread counts that are tested
 methods="simple" # list of test methods only supporting the threads argument
 methods_stride="ffi ffi_shared_buf" # list of test methods supporting the stride argument
-sdfs="sdf_basic.lua sdf_simple.lua"
+#callbacks="callback_basic.lua callback_sdf_shape.lua" # list of callback functions to test
 test_preview=true # run the render a preview using multithread_pixel_function_render.lua test
 preview_size="640" # size for multithread_pixel_function_render.lua test
 benchmark=true # run the multithread_pixel_function_benchmark.lua test
@@ -19,10 +20,10 @@ mkdir -p $outdir
 echo "benchmark output directory ${outdir}"
 
 # run "simple" tests(not using stride)
-for SDF in $sdfs; do
+for CALLBACK in $callbacks; do
 	for METHOD in $methods; do
 		for THREAD in $threads; do
-			echo "Testing SDF: ${SDF}, Method: ${METHOD}, Threads: ${THREAD}"
+			echo "Testing: ${CALLBACK}, Method: ${METHOD}, Threads: ${THREAD}"
 
 			if $test_preview; then
 				echo "Running preview..."
@@ -30,7 +31,7 @@ for SDF in $sdfs; do
 				--render_width=${preview_size} --render_height=${preview_size} \
 				--preview_scale=0.2 \
 				--duration=3 --render_fps=30 \
-				--sdf="./examples/data/${SDF}" \
+				--callback="./examples/data/${CALLBACK}" \
 				--rawfile= \
 				--log=stdout \
 				--method=${METHOD} --threads=${THREAD}
@@ -38,8 +39,8 @@ for SDF in $sdfs; do
 
 			if $benchmark; then
 				luajit ./examples/multithread_pixel_function_benchmark.lua \
-				--json=${outdir}/${SDF}_${METHOD}_${THREAD}t.json \
-				--sdf="./examples/data/${SDF}" \
+				--json=${outdir}/${CALLBACK}_${METHOD}_${THREAD}t.json \
+				--callback="./examples/data/${CALLBACK}" \
 				--log=stdout \
 				--method=${METHOD} --threads=${THREAD}
 			fi
@@ -48,11 +49,11 @@ for SDF in $sdfs; do
 done
 
 # run stride tests
-for SDF in $sdfs; do
+for CALLBACK in $callbacks; do
 	for METHOD in $methods_stride; do
 		for STRIDE in $strides; do
 			for THREAD in $threads; do
-				echo "Testing SDF: ${SDF}, Method: ${METHOD}, Threads: ${THREAD}, Stride: ${STRIDE}"
+				echo "Testing: ${CALLBACK}, Method: ${METHOD}, Threads: ${THREAD}, Stride: ${STRIDE}"
 
 				if $test_preview; then
 					echo "Running preview..."
@@ -60,7 +61,7 @@ for SDF in $sdfs; do
 					--render_width=${preview_size} --render_height=${preview_size} \
 					--preview_scale=0.2 \
 					--duration=3 --render_fps=30 \
-					--sdf="./examples/data/${SDF}" \
+					--callback="./examples/data/${CALLBACK}" \
 					--rawfile= \
 					--log=stdout \
 					--method=${METHOD} --threads=${THREAD} --stride=${STRIDE}
@@ -68,8 +69,8 @@ for SDF in $sdfs; do
 
 				if $benchmark; then
 					luajit ./examples/multithread_pixel_function_benchmark.lua \
-					--json=${outdir}/${SDF}_${METHOD}_${THREAD}t_${STRIDE}s.json \
-					--sdf="./examples/data/${SDF}" \
+					--json=${outdir}/${CALLBACK}_${METHOD}_${THREAD}t_${STRIDE}s.json \
+					--callback="./examples/data/${CALLBACK}" \
 					--log=stdout \
 					--method=${METHOD} --threads=${THREAD} --stride=${STRIDE}
 				fi
@@ -140,12 +141,12 @@ if $generate_html; then
 		<meta name="viewport" content="width=device-width, initial-scale=1">
 	</head>
 	<body style="margin: 0 0; padding: 0 0;">
-		<div style="max-width: ${SVG_WIDTH}px; margin: 0 auto; padding: 50px 50px; box-sizing: border-box;">
+		<div style="max-width: ${svg_width}px; margin: 0 auto; padding: 50px 50px; box-sizing: border-box;">
 EOF
 
 	while read i; do
 		echo "<h1>$(basename -s .svg $i)</h1>" >> ${outdir}/benchmark.html
-		echo "<img src=\"$(basename $i)\" width=$SVG_WIDTH height=$SVG_HEIGHT>" >> ${outdir}/benchmark.html
+		echo "<img src=\"$(basename $i)\" width=\"${svg_width}\" height=\"${svg_height}\">" >> ${outdir}/benchmark.html
 		echo "<hr>" >> ${outdir}/benchmark.html
 	done < <(ls -rt ${outdir}/*.svg)
 
@@ -154,4 +155,5 @@ cat << EOF >> ${outdir}/benchmark.html
 	</body>
 </html>
 EOF
+	echo "Wrote HTML output to ${outdir}/benchmark.html"
 fi
