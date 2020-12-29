@@ -1,8 +1,8 @@
-local time = require("time")
 
 -- FFI implementation of a pixel function. Hotloop optimized for LuaJIT
 -- TODO: Implement no_string argument like in ffi_shared_buf
 local function pixel_function_ffi(w,h, bytes_per_pixel, get_callbacks, ...)
+	local time = require("time")
 	local ffi = require("ffi")
 	local cdef = [[
 		void *malloc(size_t size);

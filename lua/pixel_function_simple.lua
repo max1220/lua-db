@@ -1,7 +1,7 @@
-local time = require("time")
 
 -- simple Lua implementation of a pixel function. No optimizations besides making functions local(for PUC Lua)
 local function pixel_function_simple(w,h, bytes_per_pixel, get_callbacks, ...)
+	local time = require("time")
 	local _concat = table.concat
 
 	-- get the callback functions for rendering
