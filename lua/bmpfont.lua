@@ -17,7 +17,7 @@ function BMPFont.new_bmpfont(config)
 	-- always copy drawbuffer, because we need alpha channel, and we modify
 	assert(config.db)
 	font.db = ldb_core.new_drawbuffer(config.db:width(), config.db:height(), "rgba8888")
-	config.db:origin_to_target(font.db)
+	ldb_gfx.origin_to_target(config.db, font.db)
 
 	font.char_w = assert(tonumber(config.char_w))
 	font.char_h = assert(tonumber(config.char_h))
