@@ -178,12 +178,20 @@ function ffmpeg.open_file(filename, _width, _height, time, audio, nonblocking)
 end
 
 
-function ffmpeg.write_gif(filename, width, height, framerate, frames)
-	local ffmpeg_cmd = "ffmpeg -f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d -i - -frames:v 100 %s"
-	ffmpeg_cmd = ffmpeg_cmd:format(width, height, framerate, filename)
+function ffmpeg.write_video(filename, width, height, framerate, frames)
+	local ffmpeg_cmd = "ffmpeg -f rawvideo -pixel_format rgb24 -video_size %dx%d -framerate %d -i - -frames:v %d %s"
+	ffmpeg_cmd = ffmpeg_cmd:format(width, height, framerate, #frames, filename)
 	local proc = assert(io.popen(ffmpeg_cmd, "w"))
 	for i=1, #frames do
-		proc:write(frames[i]:dump_data())
+		local frame = frames[i]
+		if (type(frame) == "string") and (#frame==width*height*3) then
+			-- write a pre-dumped drawbuffer
+			proc:write(frame)
+		else
+			-- write a drawbuffer
+			assert(frame:pixel_format()=="rgb888")
+			proc:write(frame:dump_data())
+		end
 	end
 	proc:close()
 	return true

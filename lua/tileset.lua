@@ -5,6 +5,7 @@ source tileset drawbuffer.
 ]]
 --luacheck: ignore self, no max line length
 local Tileset = {}
+local ldb_gfx = require("ldb_gfx")
 
 -- return tileset
 function Tileset.new_tileset(tileset_db, tiles)
@@ -20,11 +21,11 @@ function Tileset.new_tileset(tileset_db, tiles)
 		scale_x, scale_y = tonumber(scale_x) or tile.scale_x or 1, tonumber(scale_y) or tile.scale_y or 1
 		alpha_mode = alpha_mode or tile.alpha_mode
 		if (alpha_mode == "ignorealpha") or (not alpha_mode) then
-			tileset_db:origin_to_target(target_db, target_x, target_y, tile.x, tile.y, tile.w, tile.h, scale_x, scale_y, "ignorealpha")
+			ldb_gfx.origin_to_target(tileset_db, target_db, target_x, target_y, tile.x, tile.y, tile.w, tile.h, scale_x, scale_y, "ignorealpha")
 		elseif alpha_mode == "alphablend" then
-			tileset_db:origin_to_target(target_db, target_x, target_y, tile.x, tile.y, tile.w, tile.h, scale_x, scale_y, "alphablend")
+			ldb_gfx.origin_to_target(tileset_db, target_db, target_x, target_y, tile.x, tile.y, tile.w, tile.h, scale_x, scale_y, "alphablend")
 		elseif alpha_mode == "copy" then
-			tileset_db:origin_to_target(target_db, target_x, target_y, tile.x, tile.y, tile.w, tile.h, scale_x, scale_y)
+			ldb_gfx.origin_to_target(tileset_db, target_db, target_x, target_y, tile.x, tile.y, tile.w, tile.h, scale_x, scale_y)
 		end
 	end
 
