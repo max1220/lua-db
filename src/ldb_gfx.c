@@ -66,7 +66,7 @@ static int lua_gfx_origin_to_target(lua_State *L) {
 		}
 	}
 
-	// avoid runtime-checks in hotloop by using COPY_RECT macro and having alpha-mode and scale constant during compilation
+	// avoid runtime-checks in hotloop by using COPY_RECT macro(see header) and having alpha-mode and scale constant during compilation
 	if (alpha_mode == 0) {
 		if ((scale_x>1) || (scale_y>1)) {
 			COPY_RECT(0, scale_x, scale_y, origin_db, target_db, target_x, target_y, origin_x, origin_y, w, h)
@@ -565,7 +565,6 @@ static int lua_gfx_set_px_alphablend(lua_State *L) {
 	lua_pushboolean(L, 1);
 	return 1;
 }
-
 
 static int lua_gfx_rgb_to_hsv(lua_State *L) {
 	int r = lua_tointeger(L, 1);
