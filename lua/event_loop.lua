@@ -7,8 +7,8 @@ local event_loop = {}
 -- create a new event loop. To use the event loop, call :update() on it
 -- periodically. This will also  client:update(dt) for all event_clients, until
 -- a client returns truethy for :update(dt).
--- You can trigger an event using loop:push_event(ev). This will call
--- client:on_event(ev) for all clients, until a client returns truethy.
+-- You can trigger an event using loop:push_event(type, data). This will call
+-- client:on_event(type, data) for all clients, until a client returns truethy.
 function event_loop.new()
 	local loop = {}
 	loop.running = true
@@ -22,11 +22,11 @@ function event_loop.new()
 	end
 
 	-- push an event to all event_clients
-	function loop:push_event(ev)
+	function loop:push_event(type, data)
 		for _,event_client in ipairs(self.event_clients) do
-			local do_break = event_client:on_event(ev)
+			local do_break = event_client:on_event(type, data)
 			if do_break then
-				break
+				return do_break
 			end
 		end
 	end
@@ -93,14 +93,14 @@ function event_loop.new_client()
 	client.event_loop = nil
 
 	-- push an event to a connected event loop
-	function client:push_event(ev)
+	function client:push_event(type, data)
 		if self.event_loop then
-			self.event_loop:push_event(ev)
+			self.event_loop:push_event(type, data)
 		end
 	end
 
 	-- user callback for an event called in the event_loop:update() function
-	function client:on_event(ev) end
+	function client:on_event(type, data) end
 
 	-- user callback called when the event_loop:update is called
 	function client:on_update(dt) end
@@ -120,20 +120,20 @@ end
 -- It also ignores events with the type field set to event, update, remove, add.
 function event_loop.client_sugar_event_callbacks(client)
 	local orig_on_event = client.on_event
-	function client:on_event(ev)
+	function client:on_event(type, data)
 		-- call previous definition of client:on_event() (for chaining)
-		local do_break = orig_on_event(self, ev)
+		local do_break = orig_on_event(self, type, data)
 
-		if (not ev.type) or (not self["on_"..tostring(ev.type)]) then
+		if (not type) or (not self["on_"..tostring(type)]) then
 			return do_break -- Can't look up client callback, ignore...
 		end
-		if (ev.type == "event") or (ev.type == "update") or (ev.type == "remove") or (ev.type == "add") then
+		if (type == "event") or (type == "update") or (type == "remove") or (type == "add") then
 			return do_break -- These would call the regular client:on_event etc functions(name conflict)
 		end
 
 		-- break event_loop:update() if either the specialized on_* function,
 		-- or the previous definition of client:on_event() returned truethy.
-		do_break = do_break or self["on_"..tostring(ev.type)](self)
+		do_break = do_break or self["on_"..tostring(type)](self)
 		return do_break
 	end
 end
@@ -141,9 +141,9 @@ end
 -- Utillity function to add a check that makes sure that a client can only
 -- push an event to the event_loop during a call to event_loop:update()
 function event_loop.client_sugar_strict(client)
-	function client:push_event(ev)
+	function client:push_event(type, data)
 		if self.event_loop and self.event_loop.is_update then
-			self.event_loop:push_event(ev)
+			self.event_loop:push_event(type, data)
 		end
 	end
 end
