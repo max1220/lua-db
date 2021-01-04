@@ -49,6 +49,14 @@ static int lua_framebuffer_get_varinfo(lua_State *L) {
 	framebuffer_t *fb;
 	CHECK_FRAMEBUFFER(L, 1, fb)
 
+	if (ioctl(fb->fd, FBIOGET_VSCREENINFO, &fb->vinfo)) {
+		close(fb->fd);
+		fb->fd = -1;
+		lua_pushnil(L);
+		lua_pushfstring(L, "FBIOGET_FSCREENINFO failed: %s", strerror(errno));
+		return 2;
+	}
+
     lua_newtable(L);
 	LUA_T_PUSH_S_N("xres", fb->vinfo.xres)
     LUA_T_PUSH_S_N("yres", fb->vinfo.yres)
@@ -239,12 +247,14 @@ static int lua_fb_new_framebuffer(lua_State *L) {
 	// perform ioctl's to get info about framebuffer
     if (ioctl(fb->fd, FBIOGET_FSCREENINFO, &fb->finfo)) {
 		close(fb->fd);
+		fb->fd = -1;
 		lua_pushnil(L);
 		lua_pushfstring(L, "FBIOGET_FSCREENINFO failed: %s", strerror(errno));
 		return 2;
 	}
     if (ioctl(fb->fd, FBIOGET_VSCREENINFO, &fb->vinfo)) {
 		close(fb->fd);
+		fb->fd = -1;
 		lua_pushnil(L);
 		lua_pushfstring(L, "FBIOGET_FSCREENINFO failed: %s", strerror(errno));
 		return 2;
@@ -254,6 +264,7 @@ static int lua_fb_new_framebuffer(lua_State *L) {
     fb->data = mmap(NULL, fb->finfo.smem_len, PROT_READ | PROT_WRITE, MAP_SHARED, fb->fd, (off_t)0);
 	if (fb->data == MAP_FAILED) {
 		close(fb->fd);
+		fb->fd = -1;
 		lua_pushnil(L);
 		lua_pushfstring(L, "mmap failed: %s", strerror(errno));
 		return 2;
