@@ -1,12 +1,13 @@
-local terminal_buffer = {}
+local terminal_emulator = {}
 
-function terminal_buffer.new()
-	-- a terminal buffer is the state of a terminal emulator
+function terminal_emulator.new()
+	-- Contains functions for manipulating a terminal emulator state(e.g. write
+	-- bytes to terminal causes cursor movement, escape sequences etc.)
 	-- TODO: scrollback buffer?
-	local term_buffer = {}
+	local term_emu = {}
 
-	function term_buffer:init(term_w, term_h)
-		-- prepare the terminal buffer
+	function term_emu:init(term_w, term_h)
+		-- prepare the terminal emulator
 		self.w = term_w or 80
 		self.h = term_h or 25
 		self.escape = false
@@ -17,7 +18,7 @@ function terminal_buffer.new()
 		self:reset()
 	end
 
-	function term_buffer:reset_attr()
+	function term_emu:reset_attr()
 		-- reset attributes(colors, bold/italic)
 		self.fg = false -- current fg color
 		self.bg = false -- current bg color
@@ -27,7 +28,7 @@ function terminal_buffer.new()
 		self.underline = false -- current underline attribute
 	end
 
-	function term_buffer:reset()
+	function term_emu:reset()
 		-- perform a full terminal reset(clear attributes, screen, etc.)
 		self:reset_attr()
 		self:clear()
@@ -35,7 +36,7 @@ function terminal_buffer.new()
 		self.cursor_y = 1 -- current cursor y position
 	end
 
-	function term_buffer:clear(_char)
+	function term_emu:clear(_char)
 		-- clear the entire terminal buffer
 		for y=1, self.h do
 			self.buffer[y] = {}
@@ -43,7 +44,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:clear_line(line_y, _xmin, _xmax, _char)
+	function term_emu:clear_line(line_y, _xmin, _xmax, _char)
 		-- clear a terminal line(at line_y), from xmin to xmax(optional)
 		local char = _char or " "
 		local xmin = tonumber(_xmin) or 1
@@ -63,7 +64,7 @@ function terminal_buffer.new()
 		self.buffer[line_y] = cline
 	end
 
-	function term_buffer:resize(new_w, new_h)
+	function term_emu:resize(new_w, new_h)
 		-- resize the terminal buffer(keep content)
 		local old_w = self.w
 		local old_h = self.h
@@ -79,7 +80,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:scroll_up(count)
+	function term_emu:scroll_up(count)
 		-- scroll the content of the terminal emulator up by count lines
 		for _=1, count do
 			local removed_line = self.buffer[1]
@@ -96,7 +97,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:scroll_down(count)
+	function term_emu:scroll_down(count)
 		-- scroll the content of the terminal emulator down by count lines
 		for _=1, count do
 			local removed_line = self.buffer[self.h]
@@ -113,7 +114,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:write_sgr(sgr)
+	function term_emu:write_sgr(sgr)
 		-- handle a complete SGR sequence
 		if sgr == 0 then
 			-- reset sgr parameters
@@ -149,7 +150,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:write_csi(csi_str)
+	function term_emu:write_csi(csi_str)
 		-- handle a complete csi sequence
 		if csi_str:match("^(%d+)A$") then
 			-- cursor up
@@ -211,7 +212,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:write_escape(char)
+	function term_emu:write_escape(char)
 		local byte = char:byte()
 		if self.csi then
 			if (byte < 0x20) or (byte > 0x7F) then
@@ -255,7 +256,7 @@ function terminal_buffer.new()
 		end
 	end
 
-	function term_buffer:write_byte(char)
+	function term_emu:write_byte(char)
 		-- handle a single byte of input to the terminal
 
 		-- if we're in an escape sequence...
@@ -308,7 +309,7 @@ function terminal_buffer.new()
 		return true
 	end
 
-	function term_buffer:write(str)
+	function term_emu:write(str)
 		-- handle a sequence of bytes of input to the terminal
 		for i=1, #str do
 			local char = str:sub(i,i)
@@ -319,7 +320,7 @@ function terminal_buffer.new()
 		return true
 	end
 
-	return term_buffer
+	return term_emu
 end
 
-return terminal_buffer
+return terminal_emulator
