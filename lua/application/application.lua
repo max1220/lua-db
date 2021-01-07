@@ -36,25 +36,17 @@ function application.new(ev_loop)
 	-- perform mostly automatic initialization
 	function app:init_auto()
 		-- add graphics output capabillities to application
-		local graphics_output = require("lua-db.application.graphics_output")
-		graphics_output.add_to_application(self)
-
-		local graphics_output_sdl = require("lua-db.application.graphics_output_sdl")
-		graphics_output_sdl.add_to_application(self)
-
-		local graphics_output_drm = require("lua-db.application.graphics_output_drm")
-		graphics_output_drm.add_to_application(self)
-
-		local graphics_output_framebuffer = require("lua-db.application.graphics_output_framebuffer")
-		graphics_output_framebuffer.add_to_application(self)
+		require("lua-db.application.graphics_output").add_to_application(self)
+		--require("lua-db.application.graphics_output_sdl").add_to_application(self)
+		--require("lua-db.application.graphics_output_drm").add_to_application(self)
+		--require("lua-db.application.graphics_output_framebuffer").add_to_application(self)
+		require("lua-db.application.graphics_output_terminal").add_to_application(self)
 
 		-- add keyboard input capabillities to application
-		local keyboard_input = require("lua-db.application.keyboard_input")
-		keyboard_input.add_to_application(self)
+		require("lua-db.application.keyboard_input").add_to_application(self)
 
 		-- add mouse input capabillities to application
-		local mouse_input = require("lua-db.application.mouse_input")
-		mouse_input.add_to_application(self)
+		require("lua-db.application.mouse_input").add_to_application(self)
 
 		-- auto-configure an output(SDL, framebuffer, etc.)
 		self:auto_add_graphics_output()

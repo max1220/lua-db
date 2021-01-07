@@ -22,14 +22,14 @@ local debug_print = print
 function graphics_output.add_to_application(app)
 	app.enable_graphics = true -- enable graphics output module
 	app.graphic_outputs = {} -- list of outputs and info about outputs
-	app.graphics_ev_client = event_loop.new_client()
-	app.graphics_ev_client.app = app
-	app.ev_loop:add_client(app.graphics_ev_client) -- add graphics client to event loop
+	app.output_ev_client = event_loop.new_client()
+	app.output_ev_client.app = app
+	app.ev_loop:add_client(app.output_ev_client) -- add graphics client to event loop
 
 	debug_print("Adding graphics output capabillity to application: ", tostring(app))
 
 	-- called every iteration from the graphics_ev_client, (client for the app.ev_loop)
-	function app.graphics_ev_client:on_update()
+	function app.output_ev_client:on_update()
 		if self.app.enable_graphics then
 			for _,output in ipairs(self.app.graphic_outputs) do
 				self.app:update_output(output, dt)
@@ -66,7 +66,7 @@ function graphics_output.add_to_application(app)
 		if output.on_add then
 			output:on_add()
 		end
-		app.ev_loop:push_event("graphics_add_output_event", output)
+		self.output_ev_client:push_event("graphics_add_output_event", output)
 		return output
 	end
 
@@ -79,7 +79,7 @@ function graphics_output.add_to_application(app)
 				if output.on_remove then
 					output:on_remove()
 				end
-				app.ev_loop:push_event("graphics_remove_output_event", output)
+				app.output_ev_client:push_event("graphics_remove_output_event", output)
 				break
 			end
 		end
@@ -143,26 +143,39 @@ function graphics_output.add_to_application(app)
 			end
 		end
 
+		output = self:new_output_terminal({
+			enable_unicode = true,
+			terminal_type = "ansi_24bit",
+			enable_mouse_tracking = true,
+			terminal_draw_mode = "braile"
+		})
+
 		while not output do
 			-- ask the user for an output subsystem suggestion.
 			print("The application has requested graphical output capabillities, but auto-configuration failed.")
 			print("Options:")
-			--print(" term - Run in terminal(requires unicode and ANSI 24-bit color escape support)")
-			--print(" term_basic - Run in a basic terminal")
+			print(" term - Run in terminal(requires unicode and ANSI 24-bit color escape support)")
+			print(" term_basic - Run in a basic terminal")
 			print(" sdl [width] [height] [title]")
 			print(" drm [dri_path]")
 			print(" fb [fb_path]")
 			print(" exit - stop application")
 
+			io.write(">")
 			local input = io.read("*l")
 			if input == "exit" then
 				-- TODO: Check if this causes issues when embedding into other applications
 				print("Terminating...")
 				os.exit(0)
-			elseif input == "term" then
-				print("TODO")
-			elseif input == "term_basic" then
-				print("TODO")
+			elseif (input == "term") or (input == "term_basic") then
+				local basic = (input == "term_basic")
+				local term_config = {
+					enable_unicode = not basic,
+					terminal_type = basic and "linux" or "ansi_24bit",
+					terminal_draw_mode = basic and "characters" or "colors",
+					enable_mouse_tracking = not basic,
+				}
+				output = self:new_output_terminal(term_config)
 			elseif input:match("^sdl") then
 				local w,h = input:match("^sdl (%d+) (%d+)")
 				local title = input:match("^sdl %d+ %d+ .+$")

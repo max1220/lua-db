@@ -40,7 +40,7 @@ local lua_modules = {
 	"tetris",
 	"gol",
 	"random",
-	"terminal_buffer",
+	"terminal_emulator",
 	--"ppm",
 	--"imlib",
 	--"raw",

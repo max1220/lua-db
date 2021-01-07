@@ -46,7 +46,7 @@ function graphics_output_sdl.add_to_application(app)
 				--elseif ev.type == "windowevent" then
 					-- TODO: On resize event, re-get drawbuffer, push resize event in app.ev_loop, update output etc.
 				else
-					self.app.ev_loop:push_event("internal_sdl_raw_event", ev)
+					self.app.output_ev_client:push_event("internal_sdl_raw_event", ev)
 				end
 				ev = self.sdlfb:pool_event(self.pool_timeout)
 			end
