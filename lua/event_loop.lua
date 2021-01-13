@@ -22,9 +22,10 @@ function event_loop.new()
 	end
 
 	-- push an event to all event_clients
-	function loop:push_event(type, data)
+	-- it is prefered to push events from a connected client.
+	function loop:push_event(...)
 		for _,event_client in ipairs(self.event_clients) do
-			local do_break = event_client:on_event(type, data)
+			local do_break = event_client:on_event(...)
 			if do_break then
 				return do_break
 			end
@@ -93,14 +94,14 @@ function event_loop.new_client()
 	client.event_loop = nil
 
 	-- push an event to a connected event loop
-	function client:push_event(type, data)
+	function client:push_event(...)
 		if self.event_loop then
-			self.event_loop:push_event(type, data)
+			self.event_loop:push_event(...)
 		end
 	end
 
 	-- user callback for an event called in the event_loop:update() function
-	function client:on_event(type, data) end
+	function client:on_event(...) end
 
 	-- user callback called when the event_loop:update is called
 	function client:on_update(dt) end
@@ -120,9 +121,9 @@ end
 -- It also ignores events with the type field set to event, update, remove, add.
 function event_loop.client_sugar_event_callbacks(client)
 	local orig_on_event = client.on_event
-	function client:on_event(type, data)
+	function client:on_event(type, ...)
 		-- call previous definition of client:on_event() (for chaining)
-		local do_break = orig_on_event(self, type, data)
+		local do_break = orig_on_event(self, type, ...)
 
 		if (not type) or (not self["on_"..tostring(type)]) then
 			return do_break -- Can't look up client callback, ignore...
@@ -133,7 +134,7 @@ function event_loop.client_sugar_event_callbacks(client)
 
 		-- break event_loop:update() if either the specialized on_* function,
 		-- or the previous definition of client:on_event() returned truethy.
-		do_break = do_break or self["on_"..tostring(type)](self)
+		do_break = do_break or self["on_"..tostring(type)](self, ...)
 		return do_break
 	end
 end
@@ -141,9 +142,9 @@ end
 -- Utillity function to add a check that makes sure that a client can only
 -- push an event to the event_loop during a call to event_loop:update()
 function event_loop.client_sugar_strict(client)
-	function client:push_event(type, data)
+	function client:push_event(...)
 		if self.event_loop and self.event_loop.is_update then
-			self.event_loop:push_event(type, data)
+			self.event_loop:push_event(...)
 		end
 	end
 end
