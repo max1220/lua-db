@@ -22,7 +22,7 @@ db:clear(0,0,0,255)
 cio.target_db = db
 
 -- create a terminal buffer
-local term = ldb.terminal_buffer.new()
+local term = ldb.terminal_emulator.new()
 term:init(term_w, term_h)
 
 -- load bitmap to drawbuffer
