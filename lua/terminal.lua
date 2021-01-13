@@ -1,3 +1,5 @@
+local sequential_index = require("lua-db.sequential_index")
+
 local terminal = {}
 --[[
 Utillities for working with ANSI terminals.
@@ -38,8 +40,21 @@ term:set_bg_color(r,g,b)
 ]]
 
 
-
-
+-- simple deepcopy for appending the terminal_drawbuffer module content to the
+-- terminal. This way, each terminal can have it's own copy of "preferences",
+-- like writing a space character instead of the empty braile symbol for the
+-- brail output etc.
+-- This is not a generic deepcopy function!
+local function deepcopy(t_orig, t_new)
+	for k,v in pairs(t_orig) do
+		if type(v) == "table" then
+			t_new[k] = deepcopy(v, {})
+		else
+			t_new[k] = v
+		end
+	end
+	return t_new
+end
 
 function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 	local term = {}
@@ -47,34 +62,33 @@ function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 
 	-- append drawbuffer drawing routines(:drawbuffer_colors(), :drawbuffer_characters(), etc.)
 	local terminal_drawbuffer = require("lua-db.terminal_drawbuffer")
-	for k,v in pairs(terminal_drawbuffer) do
-		term[k] = v
-	end
+	deepcopy(terminal_drawbuffer, term)
 
-	term.write_cb = write_cb -- used to write to the terminal(emulator).
-	term.read_cb = read_cb -- used to read from the terminal.
+	term.write = write_cb -- used to write to the terminal(emulator).
+	term.read = read_cb -- used to read from the terminal.
 	term.palettes = require("lua-db.terminal_palettes") -- list of escape codes and r,g,b values. Used for setting colors.
 	term.term_type = term_type or "ansi_3bit" -- term_types = "linux", "ansi_3bit", "ansi_4bit", "ansi_8bit", "ansi_24bit"
 	term.supports_unicode = term_type ~= "linux"
 	term.no_color = false
+	term.key_sequences = require("lua-db.terminal_keys")
 	if supports_unicode ~= nil then
 		term.supports_unicode = supports_unicode
 	end
 
-	term.read_buf = {} -- the buffer of last received characters
-	term.read_buf_len = 16 -- buffer length
-	function term:read(timeout) -- read using read_cb if available(returns last character buffer, for easy pattern matching)
-		if not self.read_cb then
-			return
-		end
-		local str = self:read_cb(timeout) -- should be a string of length 1
-		if str then
-			table.insert(self.read_buf, str)
-			if #self.read_buf>self.read_buf_len then
-				table.remove(self.read_buf, 1) -- keep the buffer at read_buf_len entries
+	-- try to read a key sequence
+	function term:read_key(timeout)
+		local chars = {}
+		local function callback()
+			local key = self:read(timeout)
+			if key then
+				table.insert(chars, key)
+				return key:byte()
+			else
+				return ""
 			end
-			return str
 		end
+		local resolved = sequential_index(callback, self.key_sequences)
+		return resolved, chars
 	end
 
 	-- set cursor to x,y
@@ -83,36 +97,42 @@ function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 		local y = math.floor(tonumber(_y) or 0) + 1
 		x = (x==1) and "" or x
 		y = (y==1) and "" or y
-		return self:write_cb(("\027[%s;%sH"):format(tostring(y),tostring(x)))
+		return self:write(("\027[%s;%sH"):format(tostring(y),tostring(x)))
 	end
 
 	-- set cursor to top-left
 	function term:reset_cursor()
-		return self:write_cb("\027[;H")
+		return self:write("\027[;H")
 	end
 
 	-- make the cursor invisible(of course still uses the cursor position to append characters)
 	function term:hide_cursor()
-		self:write_cb("\027[?25l")
+		self:write("\027[?25l")
 	end
 
 	-- get the cursor position. Only possible if the read_cb is provided, since
 	-- the actual terminal(emulator) needs to answer.
 	function term:get_cursor()
-		if not self.read_cb then
+		if not self.read then
 			return -- we might not support reading, in which case this won't work
 		end
 		-- request current cursor position via escape code to stdout, result on stdin
-		self:write_cb("\027[6n")
-		self:write_cb()
-		self:read(0.1) -- check if we already got some input.
-		for _=1, self.read_buf_len do -- try up to self.read_buf_len times to match the pattern
-			local read_buf_str = table.concat(self.read_buf)
-			local y,x = read_buf_str:match("\027%[(%d+);(%d+)R$") -- match at end to only call per occurance in the buffer
-			if y and x then
-				return x,y -- found a valid sequence, return cursor coordinates as repored by terminal
+		self:write("\027[6n")
+		self:write() -- flush
+
+		local esc_seq
+		for _=1, 16 do
+			local char = self:read(0.1)
+			if char == "\027" then -- begin/restart an escape sequence
+				esc_seq = {}
+			elseif esc_seq and char:match("[%[%d;R]") then -- add to escape sequence
+				table.insert(esc_seq, char)
+				-- test complete sequence against expected pattern
+				local y,x = table.concat(esc_seq):match("^%[(%d+);(%d+)R$")
+				if y and x then
+					return x,y
+				end
 			end
-			self:read() -- re-fill the buffers if a character became available
 		end
 		-- pattern not found in input from read_cb after enough atempts
 	end
@@ -128,29 +148,29 @@ function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 
 	function term:alternate_screen_buffer(enabled)
 		if enabled then
-			return self:write_cb("\027[?1049h") -- Enable alternative screen buffer
+			return self:write("\027[?1049h") -- Enable alternative screen buffer
 		else
-			return self:write_cb("\027[?1049l") -- Disable alternative screen buffer
+			return self:write("\027[?1049l") -- Disable alternative screen buffer
 		end
 	end
 
 	function term:mouse_tracking(enabled)
 		if enabled then -- see xterm ctlseqs
-			self:write_cb("\027[?1000h") -- enable X11-style mouse tracking(report mouse button press and mouse button release)
-			self:write_cb("\027[?1003h") -- enable all mouse movement reports
-			self:write_cb("\027[?1006h") -- report as decimal for xterm-like
-			self:write_cb("\027[?1015h") -- report as decimal for urxvt
+			self:write("\027[?1000h") -- enable X11-style mouse tracking(report mouse button press and mouse button release)
+			self:write("\027[?1003h") -- enable all mouse movement reports
+			self:write("\027[?1006h") -- report as decimal for xterm-like
+			self:write("\027[?1015h") -- report as decimal for urxvt
 		else
-			self:write_cb("\027[?1000l") -- disable all mouse tracking
-			self:write_cb("\027[?1003l")
-			self:write_cb("\027[?1006l")
-			self:write_cb("\027[?1015l")
+			self:write("\027[?1000l") -- disable all mouse tracking
+			self:write("\027[?1003l")
+			self:write("\027[?1006l")
+			self:write("\027[?1015l")
 		end
 	end
 
 	-- clear the screen
 	function term:clear_screen()
-		return self:write_cb("\027[2J"..self:set_cursor(0,0))
+		return self:write("\027[2J"..self:set_cursor(0,0))
 	end
 
 	-- reset the SGR parameters, clear the screen, and set cursor to top left.
@@ -162,7 +182,7 @@ function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 
 	-- reset the SGR attributes(fg/bg color, bold, ...)
 	function term:reset_color()
-		return self:write_cb("\027[0m")
+		return self:write("\027[0m")
 	end
 
 	-- check r,g,b values
@@ -265,12 +285,12 @@ function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 
 	-- write the terminal foreground color escape code(automatic terminal type)
 	function term:set_fg_color(r,g,b)
-		return self:write_cb(self:fg_color(r,g,b))
+		return self:write(self:fg_color(r,g,b))
 	end
 
 	-- write the terminal background color escape code(automatic terminal type)
 	function term:set_bg_color(r,g,b)
-		return self:write_cb(self:bg_color(r,g,b))
+		return self:write(self:bg_color(r,g,b))
 	end
 
 	-- draws a vertical percentage bar using unicode block characters.
@@ -321,9 +341,9 @@ function terminal.new_terminal(write_cb, read_cb, term_type, supports_unicode)
 
 	function term:draw_pct_bar(len, pct)
 		if self.supports_unicode then
-			return self:write_cb(table.concat(term:draw_pct_bar_unicode(len, pct)))
+			return self:write(table.concat(term:draw_pct_bar_unicode(len, pct)))
 		else
-			return self:write_cb(table.concat(term:draw_pct_bar_ascii(len, pct)))
+			return self:write(table.concat(term:draw_pct_bar_ascii(len, pct)))
 		end
 	end
 
