@@ -66,7 +66,7 @@ static int lua_sdl2fb_pool_event(lua_State *L) {
 		return 2;
 	}
 
-	int timeout = lua_tointeger(L, 2);
+	int timeout = (int)(lua_tonumber(L, 2)*1000.0);
 
 	SDL_Event ev;
 	if (timeout <= 0) {
