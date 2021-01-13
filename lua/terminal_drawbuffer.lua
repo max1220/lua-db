@@ -1,22 +1,40 @@
 --[[
 
 This file contains functions for outputting drawbuffers to a terminal.
-It returns one function, append(term), that is called in terminal.new_terminal
-with the new terminal table. When this function is called, it appends the
-functionallty in that table.
+It supports multiple ways of outputting graphics to the terminal:
+ * regular characters, approximating brightness of pixel("ASCII art").
+ * space characters, with a ANSI escape code to set to appropriate background color.
+ * unicode braile characters(2x4 "dots" per pixel)
+ * various unicode block characters
+  * 2x3 sextants
+  * 2x2 quadrants
+  * 2x1 vertical halfblocks
+  * 1x2 horizontal halfblocks
 
+It's generic enough to be useful seperatly from the terminal module(it does not
+require it), but keep in mind that these functions might be copied into a
+terminal table. (So some optional functions like self.bg_color are implemented
+in terminal automatically, but need to be specified in arguments when used
+standalone)
 ]]
 
 
 local unicode_to_utf8 = require("lua-db.unicode_to_utf8")
 
 local function rgb_to_grey(r,g,b)
-	-- return (r+g+b)/3
-	return math.min((0.3*r)+(0.59*g)+(0.11*b), 1)
+	if r and g and b then
+		return math.min((0.3*r)+(0.59*g)+(0.11*b), 1)
+	else
+		return 0
+	end
 end
 
 local function rgb_to_bool(r,g,b)
-	return ((0.3*r)+(0.59*g)+(0.11*b))>0.5
+	if r and g and b then
+		return ((0.3*r)+(0.59*g)+(0.11*b))>0.5
+	else
+		return false
+	end
 end
 
 
@@ -31,7 +49,7 @@ local terminal_drawbuffer = {}
 function terminal_drawbuffer:drawbuffer_colors(db, lines_buf, _bg_color)
 	local w,h = db:width(), db:height()
 	local last_color_code
-	local bg_color = _bg_color or self.bg_color
+	local bg_color = assert(_bg_color or self.bg_color)
 	lines_buf = lines_buf or {}
 	for y=1, h do
 		local cline = lines_buf[y] or {}
@@ -83,10 +101,11 @@ function terminal_drawbuffer:drawbuffer_combine_bool(db, chars, win_w, win_h, li
 	_rgb_to_bool = _rgb_to_bool or rgb_to_bool
 	lines_buf = lines_buf or {}
 
-	for y=0, (h/win_h)-1 do
-		local cline = lines_buf[y] or {}
-		lines_buf[y] = cline
-		for x=0, (w/win_w)-1 do
+	local lines_buf_i = 1
+	for y=0, math.ceil((h/win_h)-1) do
+		local cline = lines_buf[y+1] or {}
+		local cline_i = 1
+		for x=0, math.ceil((w/win_w)-1) do
 			local cindex = chars
 			for win_y=0, win_h-1 do
 				for win_x=0, win_w-1 do
@@ -94,11 +113,14 @@ function terminal_drawbuffer:drawbuffer_combine_bool(db, chars, win_w, win_h, li
 					cindex = cindex[set]
 				end
 			end
-			cline[x] = cindex
+			cline[cline_i] = cindex
+			cline_i = cline_i + 1
 		end
-		cline[math.floor(w/2)+1] = nil
+		cline[cline_i+1] = nil
+		lines_buf[lines_buf_i] = cline
+		lines_buf_i = lines_buf_i + 1
 	end
-	lines_buf[math.floor(h/2)+1] = nil
+	lines_buf[lines_buf_i+1] = nil
 	return lines_buf
 end
 
