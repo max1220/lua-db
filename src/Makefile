@@ -19,7 +19,13 @@ DRM_LIBS ?= -ldrm
 #DRM_CFLAGS = $(pkg-config --cflags libdrm)
 #DRM_LIBS = $(pkg-config --libs libdrm)
 
-LDB_MODULES ?= core module_fb module_sdl module_gfx module_drm
+
+EGL_CFLAGS ?= -I/usr/include/libdrm
+EGL_LIBS ?= -ldrm -lEGL -lGLESv2 -lgbm
+
+
+
+LDB_MODULES ?= core module_fb module_sdl module_gfx module_drm module_egl
 
 STRIP ?= strip
 
@@ -65,12 +71,17 @@ module_drm: ldb_drm.so
 	$(STRIP) $^
 	@echo "-> Building DRM module finished"
 
+.PHONY: module_egl
+module_drm: ldb_egl.so
+	$(STRIP) $^
+	@echo "-> Building EGL module finished"
+
 
 .PHONY: clean
 clean:
 	@echo "-> Cleaning up build artifacts"
-	rm -f ldb_core.o ldb_gfx.o ldb_sdl.o ldb_fb.o ldb_drm.o
-	rm -f ldb_core.so ldb_gfx.so ldb_sdl.so ldb_fb.so ldb_drm.so
+	rm -f ldb_core.o ldb_gfx.o ldb_sdl.o ldb_fb.o ldb_drm.o ldb_egl.o
+	rm -f ldb_core.so ldb_gfx.so ldb_sdl.so ldb_fb.so ldb_drm.so ldb_egl.so
 
 
 ldb_core.o: ldb_core.c
@@ -110,3 +121,10 @@ ldb_drm.o: ldb_drm.c
 
 ldb_drm.so: ldb_drm.o ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(DRM_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS) $(DRM_LIBS)
+
+
+ldb_egl.o: ldb_egl.c
+	$(CC) -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) $(EGL_CFLAGS) -c $^
+
+ldb_egl.so: ldb_egl.o ldb_core.o
+	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(EGL_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS) $(EGL_LIBS)
