@@ -1,9 +1,10 @@
-/* modeset - simple Lua binding to the modeset functionallity
- * Original code by David Rheinsberg <david.rheinsberg@gmail.com> (Dedicated to
- * the Public Domain.) */
+// lua-db binding to the DRM+GBM+EGL_PLATFORM_GBM_KHR,
+// with support for using GLFW for testing.
 
 #define _GNU_SOURCE
+
 #include <errno.h>
+#include <assert.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -11,104 +12,92 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <time.h>
 #include <unistd.h>
-#include <xf86drm.h>
-#include <xf86drmMode.h>
 
 #include "lua.h"
 #include "lauxlib.h"
 #include "ldb.h"
 
 #define LUA_T_PUSH_S_N(S, N) lua_pushstring(L, S); lua_pushnumber(L, N); lua_settable(L, -3);
-#define LUA_T_PUSH_S_S(S, S2) lua_pushstring(L, S); lua_pushstring(L, S2); lua_settable(L, -3);
 #define LUA_T_PUSH_S_CF(S, CF) lua_pushstring(L, S); lua_pushcfunction(L, CF); lua_settable(L, -3);
 
-
-
-
-
-/* ----- TODO check headers from glesgui ----- */
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <string.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <time.h>
-
-#include <xf86drm.h>
-#include <xf86drmMode.h>
-#include <gbm.h>
-
+// OpenGL ES headers
 #define GL_GLEXT_PROTOTYPES 1
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
 
-#include <GL/gl.h>
+// Implementation-specific headers
+#ifdef DEBUG_USE_GLFW
+	// Include GLFW-specific headers
+	#define GLFW_INCLUDE_NONE
+	#include <GLFW/glfw3.h>
+#else
+	// Include DRM+GBM+EGL_PLATFORM_GBM_KHR specific headers
+	#include <gbm.h>
+	#include <xf86drm.h>
+	#include <xf86drmMode.h>
+#endif
 
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include <lua.h>
-#include <lualib.h>
-#include <lauxlib.h>
 
-#include <assert.h>
-
-/* ---------- */
-
-#define ARRAY_SIZE(arr) (sizeof(arr) / sizeof((arr)[0]))
-
-static struct {
-	EGLDisplay display;
-	EGLConfig config;
-	EGLContext context;
-	EGLSurface surface;
-	GLuint program;
-	GLint modelviewmatrix, modelviewprojectionmatrix, normalmatrix;
-	GLuint vbo;
-	GLuint positionsoffset, colorsoffset, normalsoffset;
-} gl;
-
-static struct {
-	struct gbm_device *dev;
-	struct gbm_surface *surface;
-} gbm;
-
-static struct {
-	int fd;
-	drmModeModeInfo *mode;
-	uint32_t crtc_id;
-	uint32_t connector_id;
-} drm;
-
-struct drm_fb {
-	struct gbm_bo *bo;
-	uint32_t fb_id;
-};
-
-struct gbm_bo *bo;
-struct drm_fb *fb;
-
+// Global state
 uint32_t width, height;
-fd_set fds;
-
 int has_init = 0;
 
-/* TODO: Belongs in a header */
-#define LDB_EGL_UDATA_NAME "EGLCard"
-#define CHECK_EGL(L, I, D) D=(lua_egl_t *)luaL_checkudata(L, I, LDB_EGL_UDATA_NAME); if (D==NULL) { lua_pushnil(L); lua_pushfstring(L, "Argument %d must be a DRM card", I); return 2; }
+PFNGLGENVERTEXARRAYSOESPROC _glGenVertexArraysOES = NULL;
+PFNGLBINDVERTEXARRAYOESPROC _glBindVertexArrayOES = NULL;
 
-typedef struct {
-	uint32_t width;
-	uint32_t height;
-	char* egldev;
-} lua_egl_t;
+// Check if init has been called in a Lua function(use with care).
+#define CHECK_INIT() if (!has_init) { lua_pushnil(L); lua_pushstring(L, "Init not called!"); return 2; }
 
 
+#ifdef DEBUG_USE_GLFW
+	// Global state for GLFW is just the window
+	GLFWwindow* window;
+#else
+	// Global state variables for DRM+GBM+EGL_PLATFORM_GBM_KHR specific
+	static struct {
+		EGLDisplay display;
+		EGLConfig config;
+		EGLContext context;
+		EGLSurface surface;
+		GLuint program;
+		GLint modelviewmatrix, modelviewprojectionmatrix, normalmatrix;
+		GLuint vbo;
+		GLuint positionsoffset, colorsoffset, normalsoffset;
+	} gl;
 
+	static struct {
+		struct gbm_device *dev;
+		struct gbm_surface *surface;
+	} gbm;
+
+	static struct {
+		int fd;
+		drmModeModeInfo *mode;
+		uint32_t crtc_id;
+		uint32_t connector_id;
+	} drm;
+
+	struct drm_fb {
+		struct gbm_bo *bo;
+		uint32_t fb_id;
+	};
+
+	struct gbm_bo *bo;
+	struct drm_fb *fb;
+
+	fd_set fds;
+#endif
+
+
+
+#ifndef DEBUG_USE_GLFW
 
 static uint32_t find_crtc_for_encoder(const drmModeRes *resources, const drmModeEncoder *encoder) {
 	int i;
@@ -155,14 +144,7 @@ static int init_drm(const char* dri_dev) {
 	drmModeEncoder *encoder = NULL;
 	int i, area;
 
-
-	if (dri_dev==NULL) {
-		printf("Using default dri device /dev/dri/card0\n");
-		drm.fd = open("/dev/dri/card0", O_RDWR);
-	} else {
-		printf("Using dri device %s\n", dri_dev);
-		drm.fd = open(dri_dev, O_RDWR);
-	}
+	drm.fd = open(dri_dev, O_RDWR);
 
 	if (drm.fd < 0) {
 		printf("could not open drm device\n");
@@ -273,11 +255,13 @@ static int init_gl(void) {
 		EGL_NONE
 	};
 
-	PFNEGLGETPLATFORMDISPLAYEXTPROC get_platform_display = NULL;
-	get_platform_display = (void *) eglGetProcAddress("eglGetPlatformDisplayEXT");
-	assert(get_platform_display != NULL);
+	// Load required extensions
 
-	gl.display = get_platform_display(EGL_PLATFORM_GBM_KHR, gbm.dev, NULL);
+	PFNEGLGETPLATFORMDISPLAYEXTPROC _eglGetPlatformDisplayEXT = NULL;
+	_eglGetPlatformDisplayEXT = (PFNEGLGETPLATFORMDISPLAYEXTPROC) eglGetProcAddress("eglGetPlatformDisplayEXT");
+	assert(_eglGetPlatformDisplayEXT != NULL);
+
+	gl.display = _eglGetPlatformDisplayEXT(EGL_PLATFORM_GBM_KHR, gbm.dev, NULL);
 
 	if (!eglInitialize(gl.display, &major, &minor)) {
 		printf("failed to initialize\n");
@@ -305,7 +289,7 @@ static int init_gl(void) {
 		return -1;
 	}
 
-	gl.surface = eglCreateWindowSurface(gl.display, gl.config, gbm.surface, NULL);
+	gl.surface = eglCreateWindowSurface(gl.display, gl.config, (EGLNativeWindowType)gbm.surface, NULL);
 	if (gl.surface == EGL_NO_SURFACE) {
 		printf("failed to create egl surface\n");
 		return -1;
@@ -318,8 +302,6 @@ static int init_gl(void) {
 
 	return 0;
 }
-
-
 
 static void drm_fb_destroy_callback(struct gbm_bo *bo, void *data) {
 	struct drm_fb *fb = data;
@@ -365,28 +347,23 @@ static void page_flip_handler(int fd, unsigned int frame, unsigned int sec, unsi
 	*waiting_for_flip = 0;
 }
 
+#endif
 
 
 
-static int lua_egl_card_update(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
+static int lua_egl_update(lua_State *L) {
+	CHECK_INIT()
 	/* Draw code here */
 	// on top of stack must be a function
-	if (lua_isfunction(L, 2)) {
-		// run lua function
-		if (lua_pcall(L, 0, 0, 0) != 0) {
-			const char* err_str = lua_tostring(L, -1);
-			lua_pushnil(L);
-			if (err_str) {
-				luaL_traceback(L, L, err_str, 0);
-			} else {
-				lua_pushstring(L, "Lua error in draw function");
-			}
-			return 2;
-		}
+	if (!lua_isfunction(L, 1)) {
+		lua_pushnil(L);
+		lua_pushstring(L, "First argument needs to be draw function");
 	}
+
+	// run lua function
+	lua_call(L, 0, 0);
+
+	#ifndef DEBUG_USE_GLFW
 
 	struct gbm_bo *next_bo;
 	int waiting_for_flip = 1;
@@ -433,88 +410,108 @@ static int lua_egl_card_update(lua_State *L) {
 	gbm_surface_release_buffer(gbm.surface, bo);
 	bo = next_bo;
 
+	#endif
+	#ifdef DEBUG_USE_GLFW
+	glfwSwapBuffers(window);
+	glfwPollEvents();
+	#endif
+
 	lua_pushboolean(L, 1);
 	return 1;
 }
 
-static int lua_egl_card_create_vao(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
+static int lua_egl_buffer_sub_data(lua_State *L) {
+	CHECK_INIT()
+	unsigned int offset = lua_tointeger(L, 1);
 
-	if (!lua_istable(L, 2) || !lua_istable(L, 3)) {
+	int use_ints = lua_toboolean(L, 2);
+
+	// Convert Lua vertice table to vertice array
+	size_t data_count = lua_objlen(L, 3);
+	void* data;
+	if (lua_toboolean(L, 4)) {
+		data = calloc(data_count, sizeof(unsigned int));
+	} else {
+		data = calloc(data_count, sizeof(float));
+	}
+
+
+	if (!data) {
+		lua_pushnil(L);
+		lua_pushstring(L, "Can't allocate data memory.");
+		free(data);
+		return 2;
+	}
+	if (data_count<=0) {
+		lua_pushnil(L);
+		lua_pushstring(L, "Must provide >0 data");
+		free(data);
+		return 2;
+	}
+	for (unsigned int i=0; i<data_count; i++) {
+		lua_rawgeti(L, 3, i+1);
+		if (use_ints) {
+			unsigned int val = lua_tointeger(L, -1);
+			unsigned int* data_int = (unsigned int*) data;
+			data_int[i] = val;
+		} else {
+			float val = lua_tonumber(L, -1);
+			float* data_float = (float*) data;
+			data_float[i] = val;
+		}
+		lua_pop(L, 1);
+	}
+
+	if (use_ints) {
+		glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, offset, data_count*sizeof(unsigned int), data);
+	} else {
+		glBufferSubData(GL_ARRAY_BUFFER, offset, data_count*sizeof(float), data);
+	}
+	free(data);
+
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		lua_pushnil(L);
+		lua_pushfstring(L, "GL Error: %d", err);
+		return 2;
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int lua_egl_create_vao(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1) || !lua_isnumber(L, 2)) {
 		lua_pushnil(L);
 		lua_pushstring(L, "Second argument needs to be a table");
 		return 2;
 	}
 
-	// Convert Lua vertice table to vertice array
-	size_t vertices_len = lua_objlen(L, 2);
-	float* vertices = calloc(vertices_len, sizeof(float));
-	if (!vertices) {
-		lua_pushnil(L);
-		lua_pushstring(L, "Can't allocate vertice memory.");
-		return 2;
-	}
-	if (vertices_len<=0) {
-		lua_pushnil(L);
-		lua_pushstring(L, "Must provide >0 vertice data");
-		return 2;
-	}
-	for (int i=0; i<vertices_len; i++) {
-		lua_rawgeti(L, 2, i+1);
-		float val = lua_tonumber(L, -1);
-		lua_pop(L, 1);
-
-		printf("#######    test---: %f\n", val);
-		vertices[i] = val;
-	}
-
-	// Convert Lua indice table to vertice array
-	size_t indices_len = lua_objlen(L, 3);
-	unsigned int* indices = calloc(indices_len, sizeof(unsigned int));
-	if (!indices) {
-		lua_pushnil(L);
-		lua_pushstring(L, "Can't allocate indice memory.");
-		return 2;
-	}
-	if (indices_len<=0) {
-		lua_pushnil(L);
-		lua_pushstring(L, "Must provide >0 indice data");
-		return 2;
-	}
-	for (int i=0; i<indices_len; i++) {
-		lua_rawgeti(L, 3, i+1);
-		unsigned int val = lua_tointeger(L, -1);
-		lua_pop(L, 1);
-
-		printf("#######    test2---: %d\n", val);
-		indices[i] = val;
-	}
-
-
+	size_t vertices_count = lua_tonumber(L, 1);
+	size_t indices_count = lua_tonumber(L, 2);
 
     unsigned int VBO, VAO, EBO;
-    glGenVertexArrays(1, &VAO);
+    _glGenVertexArraysOES(1, &VAO);
     glGenBuffers(1, &VBO);
 	glGenBuffers(1, &EBO);
     // bind the Vertex Array Object first, then bind and set vertex buffer(s), and then configure vertex attributes(s).
-    glBindVertexArray(VAO);
+    _glBindVertexArrayOES(VAO);
 
     glBindBuffer(GL_ARRAY_BUFFER, VBO);
-    glBufferData(GL_ARRAY_BUFFER, vertices_len*sizeof(float), vertices, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, vertices_count*sizeof(float), NULL, GL_STATIC_DRAW);
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_len*sizeof(unsigned int), indices, GL_STATIC_DRAW);
+	glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices_count*sizeof(unsigned int), NULL, GL_STATIC_DRAW);
 
-
-	// TODO: Find a better way than hardcoding this
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	// TODO: Find a better way for hardcoding this
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     // color attribute
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(3 * sizeof(float)));
     glEnableVertexAttribArray(1);
     // texture coord attribute
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 9 * sizeof(float), (void*)(7 * sizeof(float)));
     glEnableVertexAttribArray(2);
 
     // note that this is allowed, the call to glVertexAttribPointer registered VBO as the vertex attribute's bound vertex buffer object so afterwards we can safely unbind
@@ -522,7 +519,9 @@ static int lua_egl_card_create_vao(lua_State *L) {
 
 	GLenum err = glGetError();
 	if (err != GL_NO_ERROR) {
-		return 0;
+		lua_pushnil(L);
+		lua_pushfstring(L, "GL Error: %d", err);
+		return 2;
 	}
 
 	// return the created object ids
@@ -532,17 +531,15 @@ static int lua_egl_card_create_vao(lua_State *L) {
 	return 3;
 }
 
-static int lua_egl_card_create_program(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
-	if ((lua_isstring(L, 2) == 0) || (lua_isstring(L, 3) == 0)) {
+static int lua_egl_create_program(lua_State *L) {
+	CHECK_INIT()
+	if ((lua_isstring(L, 1) == 0) || (lua_isstring(L, 2) == 0)) {
 		lua_pushnil(L);
 		lua_pushstring(L, "3 arguments required: EGLCard, vshader, fshader");
 		return 2;
 	}
-	const char* vertexShaderSource = lua_tostring(L, 2);
-	const char* fragmentShaderSource = lua_tostring(L, 3);
+	const char* vertexShaderSource = lua_tostring(L, 1);
+	const char* fragmentShaderSource = lua_tostring(L, 2);
 
 	unsigned int vertexShader = glCreateShader(GL_VERTEX_SHADER);
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
@@ -600,22 +597,34 @@ static int lua_egl_card_create_program(lua_State *L) {
 	return 1;
 }
 
-static int lua_egl_card_create_texture2d_from_db(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
+static int lua_egl_update_texture2d_from_db(lua_State *L) {
+	CHECK_INIT()
 	drawbuffer_t *db;
-	LUA_LDB_CHECK_DB(L, 2, db)
+	LUA_LDB_CHECK_DB(L, 1, db)
 
-	int w = db->w;
-	int h = db->h;
-
-	// TODO: Support more pixel formats
-	if (db->pxfmt != LDB_PXFMT_24BPP_RGB) {
+	// TODO: Use and provide interface to glTexSubImage2D(faster, allows partial updates)
+	if (db->pxfmt == LDB_PXFMT_24BPP_RGB) {
+		//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, db->w, db->h, 0, GL_RGB, GL_UNSIGNED_BYTE, db->data);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0, db->w, db->h, GL_RGB, GL_UNSIGNED_BYTE, db->data);
+	} else if (db->pxfmt == LDB_PXFMT_32BPP_RGBA) {
+		//glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, db->w, db->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, db->data);
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0,0, db->w, db->h, GL_RGBA, GL_UNSIGNED_BYTE, db->data);
+	} else {
 		lua_pushnil(L);
-		lua_pushstring(L, "Bad pixel format!");
+		lua_pushstring(L, "Bad pixel format for drawbuffer! Only rgb888 and rgba8888 supported.");
 		return 2;
 	}
+
+	glGenerateMipmap(GL_TEXTURE_2D);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int lua_egl_create_texture2d_from_db(lua_State *L) {
+	CHECK_INIT()
+	drawbuffer_t *db;
+	LUA_LDB_CHECK_DB(L, 1, db)
 
 	unsigned int texture;
 	glGenTextures(1, &texture);
@@ -623,78 +632,75 @@ static int lua_egl_card_create_texture2d_from_db(lua_State *L) {
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, w, h, 0, GL_RGB, GL_UNSIGNED_BYTE, db->data);
+	if (lua_toboolean(L, 3)) {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	} else {
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+
+	// TODO: Support other pixel formats
+	if (db->pxfmt == LDB_PXFMT_24BPP_RGB) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, db->w, db->h, 0, GL_RGB, GL_UNSIGNED_BYTE, db->data);
+	} else if (db->pxfmt == LDB_PXFMT_32BPP_RGBA) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, db->w, db->h, 0, GL_RGBA, GL_UNSIGNED_BYTE, db->data);
+	} else {
+		lua_pushnil(L);
+		lua_pushstring(L, "Bad pixel format!");
+		return 2;
+	}
+
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	GLenum err = glGetError();
 	if (err != GL_NO_ERROR) {
-		return 0;
+		lua_pushnil(L);
+		lua_pushfstring(L, "GL error: %d!", err);
+		return 2;
 	}
 
 	lua_pushinteger(L, texture);
 	return 1;
 }
 
-static int lua_egl_card_get_info(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
-	lua_pop(L, 1);
-	lua_pushinteger(L, gbm_bo_get_width(bo));
-	lua_pushinteger(L, gbm_bo_get_height(bo));
+static int lua_egl_get_info(lua_State *L) {
+	CHECK_INIT()
+	lua_pushinteger(L, width);
+	lua_pushinteger(L, height);
 	return 2;
 }
 
-static int lua_egl_card_tostring(lua_State *L) {
-	lua_egl_t *egl = (lua_egl_t *)luaL_checkudata(L, 1, LDB_EGL_UDATA_NAME);
-
-	if (!egl) {
-		lua_pushnil(L);
-		lua_pushstring(L, "Argument 1 must be a EGL device");
-		return 2;
-	}
-
-	lua_pushfstring(L, "EGLcard: %s(%dx%d)", egl->egldev, gbm_bo_get_width(bo), gbm_bo_get_height(bo));
-    return 1;
-}
-
-static int lua_egl_card_close(lua_State *L) {
-	lua_egl_t *egl = (lua_egl_t *)luaL_checkudata(L, 1, LDB_EGL_UDATA_NAME);
-	if (!egl) {
-		lua_pushnil(L);
-		lua_pushstring(L, "Argument 1 must be a EGL device");
-		return 2;
-	}
-
+static int lua_egl_close(lua_State *L) {
+	CHECK_INIT()
 	return 0;
 }
 
-static int lua_egl_card_clear(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
+static int lua_egl_clear(lua_State *L) {
+	CHECK_INIT()
+	float r = lua_tonumber(L, 1);
+	float g = lua_tonumber(L, 2);
+	float b = lua_tonumber(L, 3);
+	float a = lua_tonumber(L, 4);
 
-	float r = lua_tonumber(L, 2);
-	float g = lua_tonumber(L, 3);
-	float b = lua_tonumber(L, 4);
-	float a = lua_tonumber(L, 5);
+	if (lua_toboolean(L, 5)) {
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	} else {
+		glClear(GL_COLOR_BUFFER_BIT);
+	}
 
 	glClearColor(r,g,b,a);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 	return 0;
 }
 
-static int lua_egl_card_use_program(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
-	if (!lua_isnumber(L, 2)) {
+static int lua_egl_use_program(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1)) {
 		return 0;
 	}
-	unsigned int program_id = lua_tointeger(L, 2);
+	unsigned int program_id = lua_tointeger(L, 1);
 
 	glUseProgram(program_id);
 
@@ -709,14 +715,12 @@ static int lua_egl_card_use_program(lua_State *L) {
 	return 1;
 }
 
-static int lua_egl_card_bind_texture2d(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
-	if (!lua_isnumber(L, 2)) {
+static int lua_egl_bind_texture2d(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1)) {
 		return 0;
 	}
-	unsigned int tex_id = lua_tointeger(L, 2);
+	unsigned int tex_id = lua_tointeger(L, 1);
 
 	glBindTexture(GL_TEXTURE_2D, tex_id);
 
@@ -729,17 +733,14 @@ static int lua_egl_card_bind_texture2d(lua_State *L) {
 	return 1;
 }
 
-
-static int lua_egl_card_bind_VAO(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
-	if (!lua_isnumber(L, 2)) {
+static int lua_egl_bind_VAO(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1)) {
 		return 0;
 	}
-	unsigned int vao_id = lua_tointeger(L, 2);
+	unsigned int vao_id = lua_tointeger(L, 1);
 
-	glBindVertexArray(vao_id);
+	_glBindVertexArrayOES(vao_id);
 
 	GLenum err = glGetError();
 	if (err != GL_NO_ERROR) {
@@ -750,14 +751,133 @@ static int lua_egl_card_bind_VAO(lua_State *L) {
 	return 1;
 }
 
-static int lua_egl_card_draw_triangles(lua_State *L) {
-	lua_egl_t *egl;
-	CHECK_EGL(L, 1, egl)
-
-	if (!lua_isnumber(L, 2)) {
+static int lua_egl_bind_VBO(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1)) {
 		return 0;
 	}
-	unsigned int vertice_count = lua_tointeger(L, 2);
+	unsigned int vbo_id = lua_tointeger(L, 1);
+
+	glBindBuffer(GL_ARRAY_BUFFER, vbo_id);
+
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		return 0;
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int lua_egl_bind_EBO(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1)) {
+		return 0;
+	}
+	unsigned int ebo_id = lua_tointeger(L, 1);
+
+	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_id);
+
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		return 0;
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int lua_egl_set_uniform_i(lua_State *L) {
+	CHECK_INIT()
+	if ((!lua_isstring(L, 1)) || (!lua_isnumber(L, 2)) || (!lua_isnumber(L, 3))) {
+		return 0;
+	}
+	const char* uniform_name = lua_tostring(L, 1);
+	int program_id = lua_tonumber(L, 2);
+	int uniform_loc = glGetUniformLocation(program_id, uniform_name);
+
+	// remaining arguments are 1-4 numbers, defaulting to 0, used as uniform values
+	int top = lua_gettop(L);
+	if (top==3) {
+		int uniform_val = lua_tointeger(L, 3);
+		glUniform1f(uniform_loc, uniform_val);
+	} else if (top==4) {
+		int uniform_val1 = lua_tointeger(L, 3);
+		int uniform_val2 = lua_tointeger(L, 4);
+		glUniform2f(uniform_loc, uniform_val1, uniform_val2);
+	} else if (top==5) {
+		int uniform_val1 = lua_tointeger(L, 3);
+		int uniform_val2 = lua_tointeger(L, 4);
+		int uniform_val3 = lua_tointeger(L, 5);
+		glUniform3f(uniform_loc, uniform_val1, uniform_val2, uniform_val3);
+	} else if (top==6) {
+		int uniform_val1 = lua_tointeger(L, 3);
+		int uniform_val2 = lua_tointeger(L, 4);
+		int uniform_val3 = lua_tointeger(L, 5);
+		int uniform_val4 = lua_tointeger(L, 6);
+		glUniform4f(uniform_loc, uniform_val1, uniform_val2, uniform_val3, uniform_val4);
+	}
+
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		lua_pushnil(L);
+		lua_pushfstring(L, "GL error: %d", err);
+		return 2;
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+static int lua_egl_set_uniform_f(lua_State *L) {
+	CHECK_INIT()
+	if ((!lua_isstring(L, 1)) || (!lua_isnumber(L, 2)) || (!lua_isnumber(L, 3))) {
+		return 0;
+	}
+	const char* uniform_name = lua_tostring(L, 1);
+	int program_id = lua_tonumber(L, 2);
+	int uniform_loc = glGetUniformLocation(program_id, uniform_name);
+
+	// remaining arguments are 1-4 numbers, defaulting to 0, used as uniform values
+	int top = lua_gettop(L);
+	if (top==3) {
+		float uniform_val = lua_tonumber(L, 3);
+		glUniform1f(uniform_loc, uniform_val);
+	} else if (top==4) {
+		float uniform_val1 = lua_tonumber(L, 3);
+		float uniform_val2 = lua_tonumber(L, 4);
+		glUniform2f(uniform_loc, uniform_val1, uniform_val2);
+	} else if (top==5) {
+		float uniform_val1 = lua_tonumber(L, 3);
+		float uniform_val2 = lua_tonumber(L, 4);
+		float uniform_val3 = lua_tonumber(L, 5);
+		glUniform3f(uniform_loc, uniform_val1, uniform_val2, uniform_val3);
+	} else if (top==6) {
+		float uniform_val1 = lua_tonumber(L, 3);
+		float uniform_val2 = lua_tonumber(L, 4);
+		float uniform_val3 = lua_tonumber(L, 5);
+		float uniform_val4 = lua_tonumber(L, 6);
+		glUniform4f(uniform_loc, uniform_val1, uniform_val2, uniform_val3, uniform_val4);
+	}
+
+	GLenum err = glGetError();
+	if (err != GL_NO_ERROR) {
+		lua_pushnil(L);
+		lua_pushfstring(L, "GL error: %d", err);
+		return 2;
+	}
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+
+static int lua_egl_draw_triangles(lua_State *L) {
+	CHECK_INIT()
+	if (!lua_isnumber(L, 1)) {
+		return 0;
+	}
+	unsigned int vertice_count = lua_tointeger(L, 1);
 
 	glDrawElements(GL_TRIANGLES, vertice_count, GL_UNSIGNED_INT, 0);
 
@@ -767,11 +887,54 @@ static int lua_egl_card_draw_triangles(lua_State *L) {
 
 
 
-static int lua_egl_new_card(lua_State *L) {
-	// TODO: Currently only allows calling this function once
+#ifdef DEBUG_USE_GLFW
+
+static int lua_egl_init_glfw(lua_State *L) {
 	if (has_init) {
 		lua_pushnil(L);
-		lua_pushstring(L, "Can't create two card simultaneously.");
+		lua_pushstring(L, "Init called already!");
+		return 2;
+	}
+	has_init = 1;
+
+	if (!glfwInit()) {
+		// Initialization failed
+		lua_pushnil(L);
+		lua_pushstring(L, "GLFW init failed!");
+		return 2;
+	}
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 0);
+	window = glfwCreateWindow(800, 600, "ldb_egl debug", NULL, NULL);
+
+	width = 800;
+	height = 600;
+
+	if (!window) {
+		// Window or OpenGL context creation failed
+		lua_pushnil(L);
+		lua_pushstring(L, "GLFW Create Window failed!");
+		return 2;
+	}
+	glfwMakeContextCurrent(window);
+	glfwSwapInterval(1);
+
+	_glGenVertexArraysOES = (PFNGLGENVERTEXARRAYSOESPROC) eglGetProcAddress("glGenVertexArraysOES");
+	assert(_glGenVertexArraysOES != NULL);
+
+	_glBindVertexArrayOES = (PFNGLBINDVERTEXARRAYOESPROC) eglGetProcAddress("glBindVertexArrayOES");
+	assert(_glBindVertexArrayOES != NULL);
+
+	lua_pushboolean(L, 1);
+	return 1;
+}
+
+#else
+
+static int lua_egl_init(lua_State *L) {
+	if (has_init) {
+		lua_pushnil(L);
+		lua_pushstring(L, "Init called already!");
 		return 2;
 	}
 	has_init = 1;
@@ -784,11 +947,6 @@ static int lua_egl_new_card(lua_State *L) {
 		lua_pushstring(L, "First argument must be a device");
 		return 2;
 	}
-
-	// put new userdata on stack
-	lua_egl_t* card = (lua_egl_t*)lua_newuserdata(L, sizeof(lua_egl_t));
-	card->egldev = strndup(egldev, egldev_len);
-
 
 	int ret;
 
@@ -835,41 +993,58 @@ static int lua_egl_new_card(lua_State *L) {
 		return 2;
 	}
 
-	// push/create metatable for drm userdata. The same metatable is used for every drm instance.
-    if (luaL_newmetatable(L, LDB_EGL_UDATA_NAME)) {
-		lua_pushstring(L, "__index");
-		lua_newtable(L);
-		LUA_T_PUSH_S_CF("get_info", lua_egl_card_get_info)
-		LUA_T_PUSH_S_CF("update", lua_egl_card_update)
-		LUA_T_PUSH_S_CF("create_program", lua_egl_card_create_program)
-		LUA_T_PUSH_S_CF("create_texture2d_from_db", lua_egl_card_create_texture2d_from_db)
-		LUA_T_PUSH_S_CF("create_vao", lua_egl_card_create_vao)
-		LUA_T_PUSH_S_CF("tostring", lua_egl_card_tostring)
-		LUA_T_PUSH_S_CF("clear", lua_egl_card_clear)
-		LUA_T_PUSH_S_CF("use_program", lua_egl_card_use_program)
-		LUA_T_PUSH_S_CF("bind_VAO", lua_egl_card_bind_VAO)
-		LUA_T_PUSH_S_CF("bind_texture2d", lua_egl_card_bind_texture2d)
-		LUA_T_PUSH_S_CF("draw_triangles", lua_egl_card_draw_triangles)
-		lua_settable(L, -3);
+	_glGenVertexArraysOES = (PFNGLGENVERTEXARRAYSOESPROC) eglGetProcAddress("glGenVertexArraysOES");
+	assert(_glGenVertexArraysOES != NULL);
 
-		LUA_T_PUSH_S_CF("__gc", lua_egl_card_close)
-		LUA_T_PUSH_S_CF("__tostring", lua_egl_card_tostring)
-	}
+	_glBindVertexArrayOES = (PFNGLBINDVERTEXARRAYOESPROC) eglGetProcAddress("glBindVertexArrayOES");
+	assert(_glBindVertexArrayOES != NULL);
 
-	// apply metatable to userdata
-    lua_setmetatable(L, -2);
-
-	// return userdata
+	lua_pushboolean(L, 1);
     return 1;
 }
 
+#endif
 
 
+
+// put all lua-accesible functions and symbols in a table
+static int push_ldb_egl_table(lua_State *L) {
+	lua_newtable(L);
+
+	LUA_T_PUSH_S_CF("get_info", lua_egl_get_info)
+	LUA_T_PUSH_S_CF("update", lua_egl_update)
+	LUA_T_PUSH_S_CF("create_program", lua_egl_create_program)
+	LUA_T_PUSH_S_CF("create_texture2d_from_db", lua_egl_create_texture2d_from_db)
+	LUA_T_PUSH_S_CF("create_vao", lua_egl_create_vao)
+	LUA_T_PUSH_S_CF("clear", lua_egl_clear)
+	LUA_T_PUSH_S_CF("use_program", lua_egl_use_program)
+	LUA_T_PUSH_S_CF("bind_VAO", lua_egl_bind_VAO)
+	LUA_T_PUSH_S_CF("bind_VBO", lua_egl_bind_VBO)
+	LUA_T_PUSH_S_CF("bind_EBO", lua_egl_bind_EBO)
+	LUA_T_PUSH_S_CF("bind_texture2d", lua_egl_bind_texture2d)
+	LUA_T_PUSH_S_CF("draw_triangles", lua_egl_draw_triangles)
+	LUA_T_PUSH_S_CF("update_texture2d_from_db", lua_egl_update_texture2d_from_db)
+	LUA_T_PUSH_S_CF("buffer_sub_data", lua_egl_buffer_sub_data)
+	LUA_T_PUSH_S_CF("set_uniform_f", lua_egl_set_uniform_f)
+	LUA_T_PUSH_S_CF("set_uniform_i", lua_egl_set_uniform_i)
+	LUA_T_PUSH_S_CF("close", lua_egl_close)
+
+	#ifdef DEBUG_USE_GLFW
+	LUA_T_PUSH_S_CF("init", lua_egl_init_glfw)
+	#else
+	LUA_T_PUSH_S_CF("init", lua_egl_init)
+	#endif
+
+	return 1;
+}
+
+
+#ifdef DEBUG_USE_GLFW
+LUALIB_API int luaopen_ldb_egl_debug(lua_State *L) {
+	return push_ldb_egl_table(L);
+}
+#else
 LUALIB_API int luaopen_ldb_egl(lua_State *L) {
-    lua_newtable(L);
-
-    LUA_T_PUSH_S_S("version", LDB_VERSION)
-    LUA_T_PUSH_S_CF("new_card", lua_egl_new_card)
-
-    return 1;
+	return push_ldb_egl_table(L);
 }
+#endif

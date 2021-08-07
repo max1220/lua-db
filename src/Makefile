@@ -25,7 +25,9 @@ EGL_LIBS ?= -ldrm -lEGL -lGLESv2 -lgbm
 
 
 
-LDB_MODULES ?= core module_fb module_sdl module_gfx module_drm module_egl
+#LDB_MODULES ?= core module_fb module_sdl module_gfx module_drm module_egl
+# TODO: currently build egl only for testing
+LDB_MODULES ?= core module_gfx module_egl
 
 STRIP ?= strip
 
@@ -72,7 +74,7 @@ module_drm: ldb_drm.so
 	@echo "-> Building DRM module finished"
 
 .PHONY: module_egl
-module_drm: ldb_egl.so
+module_egl: ldb_egl.so ldb_egl_debug.so
 	$(STRIP) $^
 	@echo "-> Building EGL module finished"
 
@@ -80,8 +82,8 @@ module_drm: ldb_egl.so
 .PHONY: clean
 clean:
 	@echo "-> Cleaning up build artifacts"
-	rm -f ldb_core.o ldb_gfx.o ldb_sdl.o ldb_fb.o ldb_drm.o ldb_egl.o
-	rm -f ldb_core.so ldb_gfx.so ldb_sdl.so ldb_fb.so ldb_drm.so ldb_egl.so
+	rm -f ldb_core.o ldb_gfx.o ldb_sdl.o ldb_fb.o ldb_drm.o ldb_egl.o ldb_egl_debug.o
+	rm -f ldb_core.so ldb_gfx.so ldb_sdl.so ldb_fb.so ldb_drm.so ldb_egl.so ldb_egl_debug.so
 
 
 ldb_core.o: ldb_core.c
@@ -128,3 +130,10 @@ ldb_egl.o: ldb_egl.c
 
 ldb_egl.so: ldb_egl.o ldb_core.o
 	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(EGL_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS) $(EGL_LIBS)
+
+
+ldb_egl_debug.o: ldb_egl.c
+	$(CC) -D DEBUG_USE_GLFW -o $@ -fPIC $(CFLAGS) $(LUA_CFLAGS) $(EGL_CFLAGS) -c $^
+
+ldb_egl_debug.so: ldb_egl_debug.o ldb_core.o
+	$(CC) -o $@ $(CFLAGS) $(LUA_CFLAGS) $(EGL_CFLAGS) $^ $(LIBFLAG) $(LUA_LIBS) $(EGL_LIBS) -lGLEW -lglfw
